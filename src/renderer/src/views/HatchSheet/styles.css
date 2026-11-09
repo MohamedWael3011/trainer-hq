@@ -1,0 +1,20 @@
+.sheet-wrap { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(20, 10, 30, 0.45); backdrop-filter: blur(6px); transition: opacity 200ms ease; }
+.sheet { width: min(700px, 100%); max-height: 100%; overflow-y: auto; background: var(--surface); border: 1px solid var(--line-2); border-radius: 20px; box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.6); padding: 22px; display: grid; gap: 16px; transition: transform 260ms var(--ease-out), opacity 200ms ease; }
+@starting-style { .sheet-wrap { opacity: 0; } .sheet { transform: scale(0.96) translateY(8px); opacity: 0; } }
+.sheet-head { display: flex; align-items: center; gap: 14px; }
+.sheet-head h2 { font-size: 18px; }
+.sheet-egg { width: 54px; height: 54px; transform-origin: 50% 90%; }
+.sheet-egg-wobble { animation: wobble 900ms var(--ease-in-out) infinite; }
+@keyframes wobble { 0%, 100% { rotate: 0deg; } 25% { rotate: -8deg; } 75% { rotate: 8deg; } }
+.sheet-form { display: grid; gap: 14px; }
+.sheet-field { display: grid; gap: 6px; }
+.sheet-field > span { font-size: 12px; font-weight: 600; color: var(--fg-2); }
+.sheet-field textarea, .sheet-field select { width: 100%; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface-2); padding: 10px 12px; outline: 0; resize: vertical; user-select: text; }
+.sheet-field textarea:focus, .sheet-field select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sheet-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sheet-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.sheet-chip { height: 27px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-2); font-size: 12px; color: var(--fg-2); transition: background-color 150ms ease, border-color 150ms ease, transform 160ms var(--ease-out); }
+.sheet-chip:active { transform: scale(0.97); }
+.sheet-chip[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); }
+.sheet-progress { max-height: 360px; overflow-y: auto; padding-right: 4px; }
+.sheet-foot { display: flex; justify-content: flex-end; gap: 8px; }

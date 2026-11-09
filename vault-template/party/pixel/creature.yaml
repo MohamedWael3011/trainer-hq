@@ -1,0 +1,19 @@
+id: pixel
+no: 4
+name: Pixel
+role: UI polish and design audits
+blurb: Compares what you built with the design, and checks spacing, type, color, states and motion.
+types: [DESIGN]
+sprite: builtin:eyenemy
+engine: claude
+autonomy: ask
+cwd: ~/code/example-app
+brain: ["brain/*.md"]
+skills: []
+tools:
+  allow: [Read, Grep, Glob]
+  ask: []
+  deny: []
+learns:
+  into: brain/
+  review: true

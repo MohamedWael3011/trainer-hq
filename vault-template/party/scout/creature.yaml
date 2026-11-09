@@ -1,0 +1,18 @@
+id: scout
+no: 1
+name: Scout
+role: Codebase explorer
+blurb: Finds where things live in your repos and explains how they work, with file paths.
+types: [EXPLORE, READ-ONLY]
+sprite: builtin:pigabyte
+engine: claude
+autonomy: full-auto
+brain: ["brain/*.md"]
+skills: []
+tools:
+  allow: [Read, Glob, Grep, "Bash(git log:*)", "Bash(ls:*)"]
+  ask: []
+  deny: [Write, Edit, "Bash(npm:*)"]
+learns:
+  into: brain/
+  review: true

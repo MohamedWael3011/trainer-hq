@@ -1,0 +1,18 @@
+id: scribe
+no: 2
+name: Scribe
+role: PRs and commit messages
+blurb: Writes PR descriptions and commit messages from your diff, in your voice.
+types: [WRITER]
+sprite: builtin:cairfrey
+engine: claude
+autonomy: ask
+brain: ["brain/*.md"]
+skills: []
+tools:
+  allow: [Read, Grep, "Bash(git diff:*)", "Bash(git log:*)", "Bash(git status)"]
+  ask: ["Bash(git commit:*)", "Bash(gh pr create:*)"]
+  deny: []
+learns:
+  into: brain/
+  review: true

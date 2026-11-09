@@ -1,0 +1,8 @@
+.care { padding: 22px; display: grid; gap: 12px; align-content: start; }
+.care-intro { display: flex; gap: 14px; align-items: center; max-width: 70ch; }
+.care-egg { width: 56px; height: 56px; }
+.care-note { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.care-src { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--fg-3); }
+.care-sprite { width: 28px; height: 28px; object-fit: contain; }
+.care-dest { justify-self: start; color: var(--teal); font-size: 11px; }
+.care-actions { display: flex; gap: 8px; }

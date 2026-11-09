@@ -1,0 +1,21 @@
+.handoff { margin-left: 40px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--violet) 35%, transparent); background: color-mix(in srgb, var(--violet) 6%, var(--surface)); overflow: hidden; transition: border-color 200ms ease; }
+@starting-style { .handoff { opacity: 0; transform: translateY(4px); } }
+.handoff { transition: opacity 220ms ease, transform 260ms var(--ease-out), border-color 200ms ease; }
+.handoff-live { border-color: color-mix(in srgb, var(--violet) 65%, transparent); }
+.handoff-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 12px; text-align: left; font-size: 12px; }
+.handoff-sprite { width: 28px; height: 28px; object-fit: contain; }
+.handoff-title { flex: 1; min-width: 0; color: var(--fg-2); }
+.handoff-title b { color: var(--fg); }
+.handoff-meta { color: var(--fg-3); font-size: 11px; white-space: nowrap; }
+.handoff-dots { display: inline-flex; gap: 3px; }
+.handoff-dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--violet); animation: handoff-dot 1s ease-in-out infinite; }
+.handoff-dots i:nth-child(2) { animation-delay: 150ms; }
+.handoff-dots i:nth-child(3) { animation-delay: 300ms; }
+@keyframes handoff-dot { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+.handoff-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 220ms var(--ease-out); }
+.handoff-body[data-open='false'] { grid-template-rows: 0fr; }
+.handoff-inner { min-height: 0; overflow: hidden; display: grid; gap: 8px; padding: 0 12px; }
+.handoff-body[data-open='true'] .handoff-inner { padding-bottom: 12px; }
+.handoff-question { font-size: 12px; color: var(--fg-2); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.handoff-answer { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.handoff-open { justify-self: start; font-size: 11px; font-weight: 700; color: var(--violet); }

@@ -1,0 +1,27 @@
+name: Bug report
+description: Something in Trainer HQ doesn't work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you saw. Screenshots welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: macOS version, Trainer HQ commit or version, `claude --version`
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error text
+      render: text

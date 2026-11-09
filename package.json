@@ -1,0 +1,87 @@
+{
+  "name": "trainer-hq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A pixel-art command center for your AI coding agents: a route dock, a notch shortcut and a dashboard.",
+  "main": "./out/main/index.js",
+  "author": "mohamedwael3011",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "package:mac": "electron-vite build && electron-builder --mac --dir && codesign --force --deep --sign - \"dist/mac-arm64/Trainer HQ.app\"",
+    "dist:mac": "electron-vite build && electron-builder --mac dmg",
+    "smoke": "electron-vite build && THQ_SMOKE_DIR=./out/smoke electron .",
+    "install:app": "bash scripts/install-app.sh",
+    "icon": "electron scripts/make-icon.cjs"
+  },
+  "dependencies": {
+    "chokidar": "3.6.0",
+    "react-markdown": "9.0.1",
+    "rehype-highlight": "7.0.1",
+    "remark-gfm": "4.0.0",
+    "yaml": "2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.9.0",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "electron-vite": "2.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.6.3",
+    "vite": "5.4.11"
+  },
+  "build": {
+    "appId": "app.trainerhq.desktop",
+    "productName": "Trainer HQ",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      },
+      {
+        "from": "vault-template",
+        "to": "vault-template"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg"
+      ],
+      "identity": null,
+      "icon": "build/icon.png"
+    }
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/mohamedwael3011/trainer-hq#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mohamedwael3011/trainer-hq.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mohamedwael3011/trainer-hq/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai-agents",
+    "electron",
+    "pixel-art",
+    "macos",
+    "notch",
+    "developer-tools"
+  ]
+}

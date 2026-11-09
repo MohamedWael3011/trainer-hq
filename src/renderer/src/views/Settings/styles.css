@@ -1,0 +1,26 @@
+.settings { padding: 20px 22px 40px; display: grid; gap: 14px; align-content: start; max-width: 900px; }
+.settings-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 4px 0 10px; background: linear-gradient(var(--bg) 70%, transparent); }
+.settings-head h2 { font-size: 18px; }
+.settings-actions { display: flex; gap: 6px; }
+.settings-error { padding: 9px 12px; border-radius: 10px; font-size: 12px; color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); white-space: pre-wrap; }
+.settings-block { display: grid; gap: 10px; }
+.settings-block > .faint { font-size: 12px; }
+.settings-field { display: grid; gap: 5px; min-width: 0; }
+.settings-field > span { font-size: 12px; font-weight: 600; color: var(--fg-2); }
+.settings-field small { font-size: 11px; }
+.settings-block input:not([type='checkbox']), .settings-block textarea { width: 100%; min-width: 0; height: 32px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); padding: 0 10px; outline: 0; user-select: text; }
+.settings-block textarea { height: auto; padding: 8px 10px; resize: vertical; }
+.settings-block input:focus, .settings-block textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.settings-block input:disabled { opacity: 0.6; }
+.settings-inline { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.settings-inline > input { flex: 1; }
+.settings-block .settings-short { flex: 0 0 150px; width: 150px; }
+.settings-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-add { justify-self: start; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.settings-check { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; cursor: pointer; }
+.settings-check input { margin-top: 2px; accent-color: #ff8cc6; }
+.settings-shortcuts { display: grid; gap: 6px; }
+.settings-shortcut { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--fg-2); }
+.settings-shortcut .kbd { min-width: 88px; text-align: center; }
+@media (max-width: 900px) { .settings-grid { grid-template-columns: 1fr; } }

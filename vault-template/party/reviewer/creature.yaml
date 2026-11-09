@@ -1,0 +1,19 @@
+id: reviewer
+no: 3
+name: Reviewer
+role: Code review and guidelines
+blurb: Reviews your diff against the repo's own conventions and points at exact lines to fix.
+types: [REVIEW]
+sprite: builtin:anoleaf
+engine: claude
+autonomy: auto-edit
+cwd: ~/code/example-app
+brain: ["brain/*.md"]
+skills: []
+tools:
+  allow: [Read, Grep, Glob, "Bash(git diff:*)", "Bash(git log:*)", "Bash(git status)"]
+  ask: []
+  deny: []
+learns:
+  into: brain/
+  review: true

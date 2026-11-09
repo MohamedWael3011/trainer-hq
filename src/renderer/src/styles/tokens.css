@@ -1,0 +1,69 @@
+@font-face {
+  font-family: 'Monocraft';
+  src: url('../assets/fonts/monocraft.otf') format('opentype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Monocraft';
+  src: url('../assets/fonts/monocraft-bold.otf') format('opentype');
+  font-weight: 600 800;
+  font-display: swap;
+}
+
+:root {
+  --bg: #fbf4fa;
+  --bg-glow: #f6d4f0;
+  --surface: #ffffff;
+  --surface-2: #f8f0f8;
+  --surface-3: #efe4f3;
+  --line: rgba(74, 40, 92, 0.09);
+  --line-2: rgba(74, 40, 92, 0.16);
+  --fg: #2a1d36;
+  --fg-2: #6b5a7c;
+  --fg-3: #9a8aab;
+  --accent: #ff5fa8;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(255, 95, 168, 0.13);
+  --green: #2f9e6a;
+  --blue: #7a5cf0;
+  --amber: #c9761a;
+  --red: #e0466e;
+  --violet: #9b6bff;
+  --teal: #b05cd6;
+  --code-bg: #1d1528;
+  --code-fg: #eadcf5;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 14px 34px -14px rgba(120, 60, 140, 0.25), 0 2px 6px -2px rgba(120, 60, 140, 0.1);
+  --font: 'Monocraft', ui-monospace, 'SF Mono', Menlo, monospace;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #130f1a;
+    --bg-glow: #3d1f45;
+    --surface: #1b1624;
+    --surface-2: #221c2d;
+    --surface-3: #2c2439;
+    --line: rgba(240, 210, 255, 0.08);
+    --line-2: rgba(240, 210, 255, 0.15);
+    --fg: #f4eafa;
+    --fg-2: #bfaed0;
+    --fg-3: #7f6f92;
+    --accent: #ff8cc6;
+    --accent-ink: #2b0b1e;
+    --accent-soft: rgba(255, 140, 198, 0.14);
+    --green: #6ee7a8;
+    --blue: #b4a0ff;
+    --amber: #fcc56b;
+    --red: #ff7a9c;
+    --violet: #c4a8ff;
+    --teal: #e0a2ff;
+    --code-bg: #0e0a14;
+    --shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 16px 40px -16px rgba(0, 0, 0, 0.75), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}

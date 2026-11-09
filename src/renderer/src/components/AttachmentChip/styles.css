@@ -1,0 +1,8 @@
+.chip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px 6px 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface-2); font-size: 12px; }
+.chip-name { font-weight: 700; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-kind { color: var(--fg-3); }
+.chip-actions { display: flex; gap: 6px; }
+.chip-done { color: var(--green); font-weight: 600; }
+.chip-remove { margin-left: auto; width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; color: var(--fg-3); transition: background-color 150ms ease, transform 160ms var(--ease-out); }
+.chip-remove:active { transform: scale(0.92); }
+@media (hover: hover) and (pointer: fine) { .chip-remove:hover { background: var(--surface-3); color: var(--fg); } }

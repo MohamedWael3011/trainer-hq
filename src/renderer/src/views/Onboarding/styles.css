@@ -1,0 +1,36 @@
+.onb-wrap { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: radial-gradient(60% 50% at 50% 0%, var(--bg-glow), transparent 70%), rgba(15, 8, 22, 0.55); backdrop-filter: blur(10px); transition: opacity 240ms ease; }
+@starting-style { .onb-wrap { opacity: 0; } .onb { transform: translateY(10px) scale(0.98); } }
+.onb { width: min(680px, 100%); max-height: 100%; overflow-y: auto; background: var(--surface); border: 1px solid var(--line-2); border-radius: 22px; box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.65); padding: 22px 24px; display: grid; gap: 18px; transition: transform 300ms var(--ease-out); }
+.onb-steps { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; flex-wrap: wrap; }
+.onb-steps li { font-size: 11px; padding: 3px 9px; border-radius: 999px; color: var(--fg-3); background: var(--surface-2); }
+.onb-steps .onb-step-now { color: var(--accent-ink); background: var(--accent); font-weight: 700; }
+.onb-steps .onb-step-done { color: var(--fg-2); }
+.onb-body { display: grid; gap: 12px; min-height: 260px; align-content: start; }
+.onb-body h2 { font-size: 18px; }
+.onb-hero { justify-items: center; text-align: center; align-content: center; }
+.onb-hero h1 { font-size: 22px; }
+.onb-hero p { max-width: 56ch; }
+.onb-egg { width: 96px; height: 96px; animation: onb-wobble 1800ms var(--ease-in-out) infinite; transform-origin: 50% 90%; }
+@keyframes onb-wobble { 0%, 60%, 100% { rotate: 0deg; } 70% { rotate: -7deg; } 80% { rotate: 7deg; } 90% { rotate: -3deg; } }
+.onb-list { display: grid; gap: 8px; }
+.onb-check { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: start; }
+.onb-check p { font-size: 12px; margin-top: 2px; }
+.onb-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.onb-field { display: grid; gap: 6px; }
+.onb-field > span { font-size: 12px; font-weight: 600; color: var(--fg-2); }
+.onb-field input { height: 36px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); padding: 0 12px; outline: 0; user-select: text; }
+.onb-field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.onb-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.onb-repo { display: flex; gap: 10px; align-items: center; font-size: 12px; cursor: pointer; }
+.onb-repo input { accent-color: #ff8cc6; }
+.onb-note { font-size: 12px; color: var(--green); }
+.onb-party { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.onb-mon { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); }
+.onb-mon-sprite { width: 48px; height: 48px; object-fit: contain; }
+.onb-mon p { font-size: 11px; margin-bottom: 4px; }
+.onb-tips { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 12px; color: var(--fg-2); }
+.onb-key { display: flex; gap: 12px; align-items: center; font-size: 12px; }
+.onb-key .kbd { min-width: 92px; text-align: center; }
+.onb-check-row { display: flex; gap: 10px; align-items: center; font-size: 12px; cursor: pointer; }
+.onb-check-row input { accent-color: #ff8cc6; }
+.onb-foot { display: flex; justify-content: flex-end; gap: 8px; }

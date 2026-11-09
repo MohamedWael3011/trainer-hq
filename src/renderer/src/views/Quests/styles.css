@@ -1,0 +1,11 @@
+.quests { padding: 20px 22px; display: grid; gap: 14px; align-content: start; }
+.quests-list { display: grid; }
+.quest-row { display: grid; grid-template-columns: 42px 1fr auto; gap: 12px; align-items: center; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+.quest-row:last-child { border-bottom: 0; }
+.quest-sprite { width: 42px; height: 42px; object-fit: contain; }
+.quest-main { display: grid; gap: 2px; text-align: left; min-width: 0; }
+.quest-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quest-meta { font-size: 11px; color: var(--fg-3); }
+.quest-error { font-size: 11px; color: var(--red); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quest-side { display: flex; gap: 6px; align-items: center; }
+.quests-empty { padding: 20px 2px; }

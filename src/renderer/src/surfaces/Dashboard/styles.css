@@ -1,0 +1,40 @@
+.dash { height: 100%; display: grid; grid-template-rows: 46px 1fr; }
+.dash-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 14px 0 86px; border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
+.dash-title { font-weight: 700; color: var(--fg-2); }
+.dash-profile-bar { display: flex; align-items: center; gap: 6px; -webkit-app-region: no-drag; }
+.dash-profiles { -webkit-app-region: no-drag; }
+.dash-add-profile { -webkit-app-region: no-drag; }
+.dash-body { display: grid; grid-template-columns: 250px 1fr; min-height: 0; }
+.dash-side { border-right: 1px solid var(--line); background: color-mix(in srgb, var(--surface-2) 70%, transparent); padding: 12px 10px; display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+.dash-nav { display: grid; gap: 2px; }
+.dash-nav button { display: flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 8px; color: var(--fg-2); text-align: left; transition: background-color 150ms ease, color 150ms ease; }
+.dash-nav button[aria-current='page'] { background: var(--surface); color: var(--fg); font-weight: 700; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 0 0 0.5px var(--line); }
+@media (hover: hover) and (pointer: fine) { .dash-nav button:not([aria-current='page']):hover { background: var(--surface-3); } }
+.dash-count { margin-left: auto; min-width: 20px; height: 18px; padding: 0 6px; border-radius: 9px; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--accent); color: var(--accent-ink); }
+.dash-roster-wrap { min-height: 0; overflow-y: auto; flex: 1; }
+.dash-label { padding: 0 10px; margin-bottom: 4px; }
+.dash-roster { display: grid; gap: 2px; }
+.dash-mon { display: grid; grid-template-columns: 38px 1fr auto; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 10px; text-align: left; transition: background-color 150ms ease, transform 160ms var(--ease-out); }
+.dash-mon:active { transform: scale(0.98); }
+.dash-mon[aria-pressed='true'] { background: var(--accent-soft); }
+@media (hover: hover) and (pointer: fine) { .dash-mon:not([aria-pressed='true']):hover { background: var(--surface-3); } }
+.dash-mon-sprite { width: 38px; height: 38px; object-fit: contain; }
+.dash-mon-text { min-width: 0; display: grid; }
+.dash-mon-name { font-weight: 700; line-height: 1.3; }
+.dash-mon-role { font-size: 11px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-mon-status { width: 8px; height: 8px; border-radius: 50%; background: var(--fg-3); opacity: 0.4; }
+.dash-mon-run { background: var(--blue); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 20%, transparent); }
+.dash-mon-wait { background: var(--amber); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 22%, transparent); }
+.dash-hatch { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; border: 1px dashed var(--line-2); color: var(--fg-2); font-weight: 600; transition: transform 160ms var(--ease-out), border-color 150ms ease; }
+.dash-hatch:active { transform: scale(0.98); }
+@media (hover: hover) and (pointer: fine) { .dash-hatch:hover { border-color: var(--accent); color: var(--fg); } }
+.dash-hatch-sprite { width: 30px; height: 30px; }
+.dash-vault { align-self: flex-start; }
+.dash-main { min-width: 0; min-height: 0; overflow-y: auto; }
+.dash-errors { margin: 16px 22px 0; padding: 10px 12px; border-radius: 10px; font-size: 12px; white-space: pre-wrap; color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
+.dash-auth { margin: 16px 22px 0; padding: 12px 14px; border-radius: 12px; display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); background: color-mix(in srgb, var(--amber) 9%, var(--surface)); font-size: 12px; }
+.dash-auth p { color: var(--fg-2); margin-top: 2px; }
+.dash-auth-actions { display: flex; gap: 6px; }
+.dash-mon[draggable='true'] { cursor: grab; }
+.dash-mon-dragging { opacity: 0.4; }
+.dash-mon-over { box-shadow: inset 0 2px 0 var(--accent); }

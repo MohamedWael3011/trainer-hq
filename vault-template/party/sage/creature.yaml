@@ -1,0 +1,19 @@
+id: sage
+no: 5
+name: Sage
+role: Explains how things work
+blurb: Answers "when does X happen?" with the exact conditions and the files that decide them. Read-only.
+types: [LOGIC, READ-ONLY]
+sprite: builtin:sampsage
+engine: claude
+autonomy: full-auto
+cwd: ~/code/example-app
+brain: ["brain/*.md", "../../shared/*.md"]
+skills: []
+tools:
+  allow: [Read, Grep, Glob, "Bash(git log:*)"]
+  ask: []
+  deny: [Write, Edit, NotebookEdit]
+learns:
+  into: brain/
+  review: true

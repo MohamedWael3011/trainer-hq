@@ -1,0 +1,31 @@
+name: My Party
+spriteOverrides: sprites/overrides
+
+# Name the projects your creatures can work in, then set `cwd:` in a creature.yaml to one of these paths.
+# Creatures without a cwd work in this vault.
+repos: {}
+#  my-app: ~/code/my-app
+
+engines:
+  claude:
+    adapter: claude
+    bin: claude
+  gemini:
+    adapter: cli
+    bin: gemini
+    args: ["-p", "{prompt}"]
+  antigravity:
+    adapter: cli
+    bin: agy
+    args: ["-p", "{prompt}"]
+
+guard:
+  fullAuto:
+    maxMinutes: 45
+    maxPlanUsage: 0.85
+    worktree: true
+  alwaysDeny: []
+
+daycare:
+  autoPropose: true
+  autoApproveFullAuto: false

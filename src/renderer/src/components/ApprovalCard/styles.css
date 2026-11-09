@@ -1,0 +1,9 @@
+.approval { display: grid; grid-template-columns: 40px 1fr; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); background: color-mix(in srgb, var(--amber) 8%, var(--surface)); }
+.approval-sprite { width: 40px; height: 40px; }
+.approval-body { display: grid; gap: 6px; min-width: 0; }
+.approval-title { font-weight: 600; }
+.approval-summary { display: block; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 12px; }
+.approval-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.approval-compact { background: rgba(255, 140, 198, 0.12); border-color: rgba(255, 140, 198, 0.3); color: #ffe3f1; }
+.approval-compact .approval-summary { background: rgba(0, 0, 0, 0.35); color: #ffd1e8; }
+.approval-compact .btn:not(.primary) { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.14); color: #f4eafa; }
