@@ -28,6 +28,7 @@ export type HqApiType = {
   resizeDock: (size: DockSizeType, persist: boolean) => Promise<DockSizeType>;
   pathForFile: (file: File) => string;
   inspectAttachment: (path: string) => Promise<AttachmentInfoType>;
+  savePastedFile: (data: ArrayBuffer, type: string) => Promise<string>;
   installSkill: (request: SkillInstallRequestType) => Promise<string>;
   chat: (request: ChatRequestType) => Promise<string>;
   hatch: (request: HatchRequestType) => Promise<string>;

@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DOCK_SHORTCUT, EngineAdapter, NOTCH_SHORTCUT } from '@shared/constants';
+import { DaycareMode, DOCK_SHORTCUT, EngineAdapter, NOTCH_SHORTCUT, type DaycareModeType } from '@shared/constants';
 import type { AppStateType, ProfileSettingsType } from '@shared/types';
 import { renderIf } from '../../lib/renderIf';
 import './styles.css';
+
+const DAYCARE_OPTIONS: { id: DaycareModeType; label: string; desc: string }[] = [
+  { id: DaycareMode.FREE, label: 'Free', desc: 'Creatures list what\'s worth remembering at the end of their answer. No extra tokens.' },
+  { id: DaycareMode.AI, label: 'AI review', desc: 'A separate Haiku pass reads chats that did real work. Catches more, costs a little.' },
+  { id: DaycareMode.OFF, label: 'Off', desc: 'No note suggestions.' },
+];
 
 type PropsType = {
   state: AppStateType;
@@ -113,7 +119,7 @@ const Settings = ({ state, onRestartOnboarding }: PropsType) => {
           <div key={index} className="settings-inline">
             <input className="settings-short" value={engine.name} disabled={engine.adapter === EngineAdapter.CLAUDE} onChange={(event) => update((current) => ({ ...current, engines: current.engines.map((entry, i) => (i === index ? { ...entry, name: event.target.value } : entry)) }))} />
             <input className="settings-short" value={engine.bin} placeholder="command" onChange={(event) => update((current) => ({ ...current, engines: current.engines.map((entry, i) => (i === index ? { ...entry, bin: event.target.value } : entry)) }))} spellCheck={false} />
-            <input value={engine.args.join(' ')} placeholder={engine.adapter === EngineAdapter.CLAUDE ? 'managed by Trainer HQ' : '-p {prompt}'} disabled={engine.adapter === EngineAdapter.CLAUDE} onChange={(event) => update((current) => ({ ...current, engines: current.engines.map((entry, i) => (i === index ? { ...entry, args: event.target.value.split(' ') } : entry)) }))} spellCheck={false} />
+            <input value={engine.args.join(' ')} placeholder={engine.adapter === EngineAdapter.CLAUDE ? 'managed by Trainer HQ' : engine.adapter === EngineAdapter.ANTIGRAVITY ? 'extra flags (optional)' : '-p {prompt}'} disabled={engine.adapter === EngineAdapter.CLAUDE} onChange={(event) => update((current) => ({ ...current, engines: current.engines.map((entry, i) => (i === index ? { ...entry, args: event.target.value.split(' ') } : entry)) }))} spellCheck={false} />
             {renderIf(engine.adapter !== EngineAdapter.CLAUDE, <button className="btn sm ghost danger" onClick={() => update((current) => ({ ...current, engines: current.engines.filter((_, i) => i !== index) }))}>Remove</button>)}
           </div>
         ))}
@@ -136,7 +142,15 @@ const Settings = ({ state, onRestartOnboarding }: PropsType) => {
 
       <div className="panel settings-block">
         <div className="eyebrow">Day Care</div>
-        <label className="settings-check"><input type="checkbox" checked={draft.daycare.autoPropose} onChange={(event) => update((current) => ({ ...current, daycare: { ...current.daycare, autoPropose: event.target.checked } }))} /><span>Suggest notes after each chat</span></label>
+        <div className="settings-field">
+          <span>Suggest notes after each chat</span>
+          <div className="seg">
+            {DAYCARE_OPTIONS.map((option) => (
+              <button key={option.id} type="button" aria-pressed={draft.daycare.mode === option.id} onClick={() => update((current) => ({ ...current, daycare: { ...current.daycare, mode: option.id } }))}>{option.label}</button>
+            ))}
+          </div>
+          <small className="faint">{DAYCARE_OPTIONS.find((option) => option.id === draft.daycare.mode)?.desc}</small>
+        </div>
         <label className="settings-check"><input type="checkbox" checked={draft.daycare.autoApproveFullAuto} onChange={(event) => update((current) => ({ ...current, daycare: { ...current.daycare, autoApproveFullAuto: event.target.checked } }))} /><span>Let full-auto creatures with review: false save notes without asking</span></label>
       </div>
 

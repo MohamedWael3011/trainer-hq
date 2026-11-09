@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { basename, join } from 'path';
 import YAML from 'yaml';
-import { EngineAdapter } from '@shared/constants';
+import { EngineAdapter, type EngineAdapterType } from '@shared/constants';
 import type { ProfileSettingsType } from '@shared/types';
-import { DEFAULT_ALWAYS_DENY } from './config';
+import { DEFAULT_ALWAYS_DENY, toDaycareMode } from './config';
 
 const PROFILE_FILE = 'profile.yaml';
 
@@ -20,12 +20,11 @@ export const readSettings = (vault: string): ProfileSettingsType => {
   const clock = record(lab.clock);
   const engines = Object.entries(record(data.engines)).map(([name, value]) => {
     const raw = record(value);
-    return {
-      name,
-      adapter: raw.adapter === EngineAdapter.CLAUDE ? EngineAdapter.CLAUDE : EngineAdapter.CLI,
-      bin: text(raw.bin, name),
-      args: Array.isArray(raw.args) ? raw.args.map(String) : [],
-    };
+    const bin = text(raw.bin, name);
+    const isAgy = raw.adapter === EngineAdapter.ANTIGRAVITY || (raw.adapter !== EngineAdapter.CLAUDE && basename(bin) === 'agy');
+    const adapter: EngineAdapterType = raw.adapter === EngineAdapter.CLAUDE ? EngineAdapter.CLAUDE : isAgy ? EngineAdapter.ANTIGRAVITY : EngineAdapter.CLI;
+    const args = Array.isArray(raw.args) ? raw.args.map(String) : [];
+    return { name, adapter, bin, args: isAgy ? args.filter((arg) => !['-p', '--print', '--prompt', '{prompt}'].includes(arg)) : args };
   });
   if (!engines.some((engine) => engine.name === 'claude')) engines.unshift({ name: 'claude', adapter: EngineAdapter.CLAUDE, bin: 'claude', args: [] });
   return {
@@ -42,7 +41,7 @@ export const readSettings = (vault: string): ProfileSettingsType => {
       builtInDeny: DEFAULT_ALWAYS_DENY,
     },
     daycare: {
-      autoPropose: daycare.autoPropose !== false,
+      mode: toDaycareMode(daycare),
       autoApproveFullAuto: daycare.autoApproveFullAuto === true,
     },
     env: Object.entries(record(data.env)).map(([key, value]) => ({ key, value: text(value) })),
@@ -80,7 +79,8 @@ export const writeSettings = (vault: string, settings: ProfileSettingsType): voi
   doc.setIn(['guard', 'fullAuto', 'maxPlanUsage'], settings.guard.maxPlanUsage);
   doc.setIn(['guard', 'fullAuto', 'worktree'], settings.guard.worktree);
   doc.setIn(['guard', 'alwaysDeny'], settings.guard.alwaysDeny.map((rule) => rule.trim()).filter(Boolean));
-  doc.setIn(['daycare', 'autoPropose'], settings.daycare.autoPropose);
+  doc.setIn(['daycare', 'mode'], settings.daycare.mode);
+  if (doc.hasIn(['daycare', 'autoPropose'])) doc.deleteIn(['daycare', 'autoPropose']);
   doc.setIn(['daycare', 'autoApproveFullAuto'], settings.daycare.autoApproveFullAuto);
   const env = settings.env.filter((entry) => entry.key.trim());
   if (env.length > 0) doc.set('env', Object.fromEntries(env.map((entry) => [entry.key.trim(), entry.value])));

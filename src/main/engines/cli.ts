@@ -41,10 +41,13 @@ export const runCli = (options: {
   const done = new Promise<RunOutcomeType>((resolve) => {
     const finish = (code: number | null, spawnError?: Error) => {
       if (timer) clearTimeout(timer);
+      // Some CLIs exit 0 with no output and explain why on stderr (e.g. a denied permission).
+      const quietFailure = code === 0 && !output.trim() && stderr.trim() ? stderr.trim() : undefined;
+      const error = spawnError?.message ?? quietFailure ?? (code === 0 ? undefined : stderr.trim() || `${bin} exited with code ${code}`);
       resolve({
-        ok: !spawnError && code === 0 && !cancelled && !timedOut,
+        ok: !error && !cancelled && !timedOut,
         resultText: output.trim(),
-        error: spawnError?.message ?? (code === 0 ? undefined : stderr.trim() || `${bin} exited with code ${code}`),
+        error,
         usageLimited: false,
         cancelled,
         timedOut,

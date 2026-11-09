@@ -1,8 +1,8 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { join, resolve } from 'path';
+import { basename, join, resolve } from 'path';
 import YAML from 'yaml';
-import { EngineAdapter, type EngineAdapterType } from '@shared/constants';
+import { DaycareMode, EngineAdapter, type DaycareModeType, type EngineAdapterType } from '@shared/constants';
 import { appHome, expandHome, vaultTemplateDir } from './paths';
 
 export type EngineConfigType = {
@@ -39,7 +39,7 @@ export type ProfileConfigType = {
   repos: Record<string, string>;
   engines: Record<string, EngineConfigType>;
   guard: GuardConfigType;
-  daycareAutoPropose: boolean;
+  daycareMode: DaycareModeType;
   daycareAutoApproveFullAuto: boolean;
   spriteOverrides: string;
   env: Record<string, string>;
@@ -135,13 +135,26 @@ export const setActiveProfile = (profileId: string): void => {
   writeFileSync(profilesPath(), YAML.stringify({ ...current, active: profileId }));
 };
 
+const DAYCARE_MODES = Object.values(DaycareMode) as string[];
+
+// Older profiles only had autoPropose: true/false.
+export const toDaycareMode = (daycare: Record<string, unknown>): DaycareModeType => {
+  if (DAYCARE_MODES.includes(String(daycare.mode))) return daycare.mode as DaycareModeType;
+  return daycare.autoPropose === false ? DaycareMode.OFF : DaycareMode.FREE;
+};
+
+const LEGACY_PROMPT_ARGS = new Set(['-p', '--print', '--prompt', '{prompt}']);
+
 const toEngine = (value: unknown): EngineConfigType | null => {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
-  const adapter = raw.adapter === EngineAdapter.CLAUDE ? EngineAdapter.CLAUDE : EngineAdapter.CLI;
   const bin = typeof raw.bin === 'string' ? raw.bin : DEFAULT_ENGINE;
+  // Older vaults ran agy through the generic cli adapter, which can't grant it permissions.
+  const isAgy = raw.adapter === EngineAdapter.ANTIGRAVITY || (raw.adapter !== EngineAdapter.CLAUDE && basename(bin) === 'agy');
+  const adapter = raw.adapter === EngineAdapter.CLAUDE ? EngineAdapter.CLAUDE : isAgy ? EngineAdapter.ANTIGRAVITY : EngineAdapter.CLI;
   const args = Array.isArray(raw.args) ? raw.args.map(String) : [];
-  return { adapter, bin, args };
+  // The antigravity adapter passes the prompt itself; drop the old cli-style "-p {prompt}".
+  return { adapter, bin, args: adapter === EngineAdapter.ANTIGRAVITY ? args.filter((arg) => !LEGACY_PROMPT_ARGS.has(arg)) : args };
 };
 
 const toLab = (value: unknown, vault: string): LabConfigType | undefined => {
@@ -197,7 +210,7 @@ export const loadProfileConfig = (vaultSetting: string): ProfileConfigType => {
       fullAutoWorktree: fullAuto.worktree !== false,
       alwaysDeny: [...DEFAULT_ALWAYS_DENY, ...((guard.alwaysDeny ?? []) as string[])],
     },
-    daycareAutoPropose: daycare.autoPropose !== false,
+    daycareMode: toDaycareMode(daycare),
     daycareAutoApproveFullAuto: daycare.autoApproveFullAuto === true,
     spriteOverrides: join(vault, typeof data.spriteOverrides === 'string' ? data.spriteOverrides : DEFAULT_OVERRIDES),
     lab: toLab(data.lab, vault),

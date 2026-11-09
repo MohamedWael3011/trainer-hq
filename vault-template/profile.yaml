@@ -15,9 +15,8 @@ engines:
     bin: gemini
     args: ["-p", "{prompt}"]
   antigravity:
-    adapter: cli
+    adapter: antigravity
     bin: agy
-    args: ["-p", "{prompt}"]
 
 guard:
   fullAuto:
@@ -27,5 +26,5 @@ guard:
   alwaysDeny: []
 
 daycare:
-  autoPropose: true
+  mode: free            # free | ai | off
   autoApproveFullAuto: false

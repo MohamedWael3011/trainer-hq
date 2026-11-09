@@ -36,6 +36,7 @@ const api: HqApiType = {
   resizeDock: (size: DockSizeType, persist: boolean): Promise<DockSizeType> => ipcRenderer.invoke(Ipc.DOCK_RESIZE, size, persist),
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
   inspectAttachment: (path: string): Promise<AttachmentInfoType> => ipcRenderer.invoke(Ipc.ATTACHMENT_INSPECT, path),
+  savePastedFile: (data: ArrayBuffer, type: string): Promise<string> => ipcRenderer.invoke(Ipc.ATTACHMENT_SAVE_PASTE, data, type),
   installSkill: (request: SkillInstallRequestType): Promise<string> => ipcRenderer.invoke(Ipc.SKILL_INSTALL, request),
   chat: (request: ChatRequestType): Promise<string> => ipcRenderer.invoke(Ipc.CHAT_SEND, request),
   hatch: (request: HatchRequestType): Promise<string> => ipcRenderer.invoke(Ipc.HATCH_START, request),

@@ -7,10 +7,37 @@ import { EventKind } from '@shared/constants';
 
 const INBOX = join('daycare', 'inbox');
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-const TRANSCRIPT_LIMIT = 24_000;
+const TRANSCRIPT_LIMIT = 8_000;
+const EVENT_LIMIT = 1_200;
+const MIN_ANSWER_FOR_AI = 400;
 const MAX_PROPOSALS = 5;
 
 const inboxDir = (vault: string): string => join(vault, INBOX);
+
+export const REMEMBER_HEADING = 'Worth remembering:';
+const REMEMBER_SECTION = /(?:^|\n)\**Worth remembering:?\**:?[ \t]*\n((?:[ \t]*[-*] .+(?:\n|$))+)/i;
+
+export type ProposalType = { target: string; body: string };
+
+const lastAnswer = (quest: QuestType): string =>
+  [...quest.events].reverse().find((event) => event.kind === EventKind.RESULT || event.kind === EventKind.TEXT)?.text ?? '';
+
+// Free mode: the creature was asked to end with a "Worth remembering:" list. Read it, no model call.
+export const inlineProposals = (vault: string, creature: CreatureType, quest: QuestType): ProposalType[] => {
+  const match = REMEMBER_SECTION.exec(lastAnswer(quest));
+  if (!match) return [];
+  const target = relative(vault, join(creature.dir, creature.learnsInto, 'learned.md'));
+  return match[1]
+    .split('\n')
+    .map((line) => line.replace(/^[ \t]*[-*] /, '').trim())
+    .filter(Boolean)
+    .slice(0, MAX_PROPOSALS)
+    .map((body) => ({ target, body }));
+};
+
+// AI mode only pays for a review when the chat did real work.
+export const worthReviewing = (quest: QuestType): boolean =>
+  quest.events.some((event) => event.kind === EventKind.TOOL) || lastAnswer(quest).length >= MIN_ANSWER_FOR_AI;
 
 export const listDaycare = (vault: string): DaycareNoteType[] => {
   const dir = inboxDir(vault);
@@ -57,7 +84,7 @@ export const dismissNote = (vault: string, id: string): void => {
 export const buildProposalPrompt = (creature: CreatureType, quest: QuestType): string => {
   const transcript = quest.events
     .filter((event) => event.kind !== EventKind.SYSTEM)
-    .map((event) => `[${event.kind}] ${event.text}`)
+    .map((event) => `[${event.kind}] ${event.text.slice(0, EVENT_LIMIT)}`)
     .join('\n')
     .slice(-TRANSCRIPT_LIMIT);
   return [
@@ -70,15 +97,19 @@ export const buildProposalPrompt = (creature: CreatureType, quest: QuestType): s
   ].join('\n');
 };
 
-export const writeProposals = (vault: string, creature: CreatureType, quest: QuestType, resultText: string): string[] => {
+export const parseProposals = (resultText: string): ProposalType[] => {
   const jsonMatch = resultText.match(/\[[\s\S]*\]/);
   if (!jsonMatch) return [];
-  let items: { target?: string; body?: string }[];
   try {
-    items = JSON.parse(jsonMatch[0]);
+    const items = JSON.parse(jsonMatch[0]) as { target?: unknown; body?: unknown }[];
+    return items.filter((item) => typeof item.target === 'string' && typeof item.body === 'string') as ProposalType[];
   } catch {
     return [];
   }
+};
+
+export const writeProposals = (vault: string, creature: CreatureType, quest: QuestType, items: ProposalType[]): string[] => {
+  if (items.length === 0) return [];
   mkdirSync(inboxDir(vault), { recursive: true });
   return items
     .filter((item) => item.target && item.body && insideVault(vault, item.target))

@@ -6,6 +6,7 @@ import type {
   LabLangType,
   LabSchemeType,
   AutonomyType,
+  DaycareModeType,
   DaycareActionType,
   DecisionType,
   EventKindType,
@@ -250,7 +251,7 @@ export type ProfileSettingsType = {
   repos: { name: string; path: string }[];
   engines: { name: string; adapter: EngineAdapterType; bin: string; args: string[] }[];
   guard: { maxMinutes: number; maxPlanUsage: number; worktree: boolean; alwaysDeny: string[]; builtInDeny: string[] };
-  daycare: { autoPropose: boolean; autoApproveFullAuto: boolean };
+  daycare: { mode: DaycareModeType; autoApproveFullAuto: boolean };
   env: { key: string; value: string }[];
   lab: {
     enabled: boolean;

@@ -20,6 +20,16 @@ export const CLAUDE_MODELS = [
   { id: 'haiku', label: 'Haiku', desc: 'Fastest and cheapest' },
 ] as const;
 
+// How Day Care finds notes worth keeping after a chat.
+// free: the creature lists them itself at the end of its answer (no extra model call).
+// ai: a separate cheap Haiku pass reads the chat. off: no suggestions.
+export const DaycareMode = {
+  FREE: 'free',
+  AI: 'ai',
+  OFF: 'off',
+} as const;
+export type DaycareModeType = (typeof DaycareMode)[keyof typeof DaycareMode];
+
 export const QuestStatus = {
   RUNNING: 'running',
   WAITING: 'waiting',
@@ -50,6 +60,7 @@ export type EventKindType = (typeof EventKind)[keyof typeof EventKind];
 
 export const EngineAdapter = {
   CLAUDE: 'claude',
+  ANTIGRAVITY: 'antigravity',
   CLI: 'cli',
 } as const;
 export type EngineAdapterType = (typeof EngineAdapter)[keyof typeof EngineAdapter];
@@ -163,6 +174,7 @@ export const Ipc = {
   DOCK_SET_HIDDEN: 'dock:set-hidden',
   DOCK_RESIZE: 'dock:resize',
   ATTACHMENT_INSPECT: 'attachment:inspect',
+  ATTACHMENT_SAVE_PASTE: 'attachment:save-paste',
   SKILL_INSTALL: 'skill:install',
   LOGIN_ITEM_SET: 'app:login-item-set',
 } as const;

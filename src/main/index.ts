@@ -4,7 +4,7 @@ import { DOCK_SHORTCUT, Ipc, LAB_PROTOCOL, NOTCH_SHORTCUT, SPRITE_PROTOCOL, type
 import type { ApprovalDecisionType, ChatRequestType, DaycareDecisionType, DockSizeType, HatchRequestType, LabShootRequestType, ProfileCreateRequestType, ProfileSettingsType, SkillInstallRequestType, ThreadCreateRequestType } from '@shared/types';
 import { expandHome } from './paths';
 import { pathToFileURL } from 'url';
-import { inspectAttachment } from './attachments';
+import { inspectAttachment, savePastedFile } from './attachments';
 import { loadLoginShellPath } from './env';
 import { watchFullscreen } from './fullscreen';
 import { resourcesDir } from './paths';
@@ -67,6 +67,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.LOGIN_ITEM_GET, () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle(Ipc.NOTCH_METRICS, () => windows.notchMetrics());
   ipcMain.handle(Ipc.ATTACHMENT_INSPECT, (_event, path: string) => inspectAttachment(path));
+  ipcMain.handle(Ipc.ATTACHMENT_SAVE_PASTE, (_event, data: ArrayBuffer, type: string) => savePastedFile(data, type));
   ipcMain.handle(Ipc.SKILL_INSTALL, (_event, request: SkillInstallRequestType) => hq.installSkill(request));
   ipcMain.handle(Ipc.DOCK_SET_HIDDEN, (_event, hidden: boolean) => hq.setDockHidden(hidden));
   ipcMain.handle(Ipc.DOCK_RESIZE, (_event, size: DockSizeType, persist: boolean) => {

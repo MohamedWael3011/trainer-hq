@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process';
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { basename, dirname, extname, join } from 'path';
 import { randomUUID } from 'crypto';
@@ -123,4 +123,23 @@ export const installSkill = (source: string, skillsDir: string): string => {
   } finally {
     if (temp) rmSync(temp, { recursive: true, force: true });
   }
+};
+
+const PASTE_EXT: Record<string, string> = {
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+  'image/heic': '.heic',
+  'application/pdf': '.pdf',
+};
+
+// Pasted screenshots have no file on disk, so save them where a creature can read them.
+export const savePastedFile = (data: ArrayBuffer, type: string): string => {
+  const dir = join(appHome(), 'pastes');
+  mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const path = join(dir, `paste-${stamp}-${randomUUID().slice(0, 6)}${PASTE_EXT[type] ?? '.bin'}`);
+  writeFileSync(path, Buffer.from(data));
+  return path;
 };

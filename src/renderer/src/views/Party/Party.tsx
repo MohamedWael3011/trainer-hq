@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
 import { AttachmentKind, QuestKind } from '@shared/constants';
 import type { AppStateType, AttachmentInfoType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
@@ -17,6 +17,7 @@ type PropsType = {
 };
 
 const HISTORY = 12;
+const COMPOSER_MAX_HEIGHT = 200;
 
 const Party = ({ state, creatureId }: PropsType) => {
   const creature = creatureById(state, creatureId);
@@ -37,10 +38,22 @@ const Party = ({ state, creatureId }: PropsType) => {
   const dragDepth = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, COMPOSER_MAX_HEIGHT)}px`;
+  }, [draft]);
 
   const addFiles = useCallback(async (files: FileList | File[]) => {
-    const paths = Array.from(files).map((file) => window.hq.pathForFile(file)).filter(Boolean);
+    // Files from Finder have a path; pasted screenshots don't, so save those first.
+    const paths = (await Promise.all(Array.from(files).map(async (file) => {
+      const path = window.hq.pathForFile(file);
+      if (path) return path;
+      return window.hq.savePastedFile(await file.arrayBuffer(), file.type).catch(() => '');
+    }))).filter(Boolean);
     if (paths.length === 0) return;
     const quoted = paths.map((path) => (/\s/.test(path) ? `"${path}"` : path)).join(' ');
     const input = inputRef.current;
@@ -91,10 +104,14 @@ const Party = ({ state, creatureId }: PropsType) => {
     if (event.dataTransfer.files.length > 0) void addFiles(event.dataTransfer.files);
   }, [addFiles, resetDrag]);
 
-  const onPaste = useCallback((event: ClipboardEvent<HTMLInputElement>) => {
-    if (event.clipboardData.files.length === 0) return;
+  const onPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === 'file')
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => !!file);
+    if (files.length === 0) return;
     event.preventDefault();
-    void addFiles(event.clipboardData.files);
+    void addFiles(files);
   }, [addFiles]);
 
   const onPick = useCallback((event: ChangeEvent<HTMLInputElement>) => {
@@ -113,14 +130,21 @@ const Party = ({ state, creatureId }: PropsType) => {
     endRef.current?.scrollIntoView({ block: 'end' });
   }, [creatureId, quests.length, lastEventCount, approvals.length]);
 
-  const send = useCallback((event: FormEvent) => {
-    event.preventDefault();
+  const send = useCallback((event?: FormEvent) => {
+    event?.preventDefault();
     const text = draft.trim();
     if (!text || !creature) return;
     void window.hq.chat({ creatureId: creature.id, text, threadId });
     setDraft('');
     setAttachments([]);
   }, [draft, creature, threadId]);
+
+  // Enter sends, Shift+Enter adds a line. Skip while an IME is composing (e.g. Arabic or Japanese input).
+  const onComposerKey = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    send();
+  }, [send]);
 
   if (!creature) return <div className="party-empty">Hatch your first creature to start.</div>;
   const autonomy = AUTONOMY_INFO[creature.autonomy];
@@ -199,7 +223,7 @@ const Party = ({ state, creatureId }: PropsType) => {
           +
           <input type="file" multiple onChange={onPick} />
         </label>
-        <input ref={inputRef} value={draft} onChange={(event) => setDraft(event.target.value)} onPaste={onPaste} placeholder={busy ? `${creature.name} is working. You can queue another message.` : `Message ${creature.name} · drop or paste files to add their path`} />
+        <textarea ref={inputRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} onPaste={onPaste} placeholder={busy ? `${creature.name} is working. You can queue another message.` : `Message ${creature.name} · Shift+Enter for a new line · drop or paste files and screenshots`} />
         <button className="btn primary sm" type="submit" disabled={!draft.trim()}>Send</button>
       </form>
       {renderIf(dragging, <div className="party-drop">Drop files for {creature.name}</div>)}

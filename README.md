@@ -262,7 +262,7 @@ guard:
     - "Bash(gh pr merge:*)"
 
 daycare:
-  autoPropose: true
+  mode: free                          # free: creatures list notes themselves · ai: extra Haiku pass · off
   autoApproveFullAuto: false
 
 env:                                  # extra environment variables for every creature

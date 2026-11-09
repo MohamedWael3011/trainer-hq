@@ -5,6 +5,7 @@ import {
   Autonomy,
   MAX_HANDOFF_DEPTH,
   DaycareAction,
+  DaycareMode,
   EngineAdapter,
   EventKind,
   QuestKind,
@@ -35,7 +36,7 @@ import { attachmentDirs, detectPaths, installSkill, prepareAttachments } from '.
 import { checkAuth, openLoginTerminal } from './auth';
 import { buildSystemPrompt } from './brain';
 import { addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
-import { approveNote, buildProposalPrompt, dismissNote, listDaycare, writeProposals } from './daycare';
+import { approveNote, buildProposalPrompt, dismissNote, inlineProposals, listDaycare, parseProposals, worthReviewing, writeProposals, type ProposalType } from './daycare';
 import { runClaude } from './engines/claude';
 import { runCli } from './engines/cli';
 import type { RunHandleType } from './engines/types';
@@ -50,6 +51,10 @@ import { checkPrerequisites } from './prereqs';
 import { loadCreatures, updateCreatureFile, watchVault } from './registry';
 import { clearOverride, resolveSprite, setOverride } from './sprites';
 import { loadUi, saveUi } from './ui';
+import { planAntigravityArgs, runAntigravity } from './engines/antigravity';
+
+const AGY_SESSION_PREFIX = 'agy:';
+const DAYCARE_MODEL = 'haiku';
 
 const STATE_THROTTLE_MS = 60;
 const HANDOFF_TIMEOUT_MS = 10 * 60_000;
@@ -201,7 +206,8 @@ export class Hq {
     const quest = this.quests.create(creature.id, kind, options.recordText ?? prompt, cwd, options.parentId, options.askedBy, thread?.id);
     if (options.record) this.quests.addEvent(quest.id, { kind: EventKind.USER, text: options.recordText ?? prompt });
     const planUsage = this.usage?.fiveHour ?? 0;
-    if (creature.autonomy === Autonomy.FULL_AUTO && planUsage >= this.profile.guard.fullAutoMaxPlanUsage) {
+    // The plan-usage guard is about the Claude plan; other engines have their own quotas.
+    if (engine.adapter === EngineAdapter.CLAUDE && creature.autonomy === Autonomy.FULL_AUTO && planUsage >= this.profile.guard.fullAutoMaxPlanUsage) {
       this.quests.addEvent(quest.id, {
         kind: EventKind.ERROR,
         text: `Not started: your 5-hour plan usage is at ${Math.round(planUsage * 100)}%, above the full-auto limit of ${Math.round(this.profile.guard.fullAutoMaxPlanUsage * 100)}%. Switch this creature to auto-edit or wait for the reset.`,
@@ -213,9 +219,13 @@ export class Hq {
       ? `You are in the thread "${thread.title}". Work in ${thread.cwd ?? cwd}${thread.branch ? ` on branch ${thread.branch}` : ''}${thread.pr ? ` (PR ${thread.pr})` : ''}${thread.worktree ? '. This is an isolated git worktree just for this thread.' : '.'} Keep this thread focused on that work.`
       : '';
     const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, threadContext);
+    // Claude and Antigravity session ids live in the same slot, so tag Antigravity's to keep them apart.
+    const stored = options.resume ? this.quests.sessionFor(sessionKey) : undefined;
+    const agySession = stored?.startsWith(AGY_SESSION_PREFIX) ? stored.slice(AGY_SESSION_PREFIX.length) : undefined;
+    const claudeSession = stored && !stored.startsWith(AGY_SESSION_PREFIX) ? stored : undefined;
     const callbacks = {
       onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => this.quests.addEvent(quest.id, event),
-      onSession: (sessionId: string) => this.quests.setSession(quest.id, sessionId),
+      onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : sessionId),
       onUsage: (usage: UsageType) => {
         this.usage = usage;
         this.emit();
@@ -228,7 +238,7 @@ export class Hq {
         profile: this.profile,
         systemPrompt,
         questId: quest.id,
-        resumeSessionId: options.resume ? this.quests.sessionFor(sessionKey) : undefined,
+        resumeSessionId: claudeSession,
         skipWorktree: !!thread?.worktree,
         bridge: {
           serverScript: join(resourcesDir(), 'mcp', 'permission-server.cjs'),
@@ -239,6 +249,12 @@ export class Hq {
         },
       });
       handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(), timeoutMs: plan.timeoutMs, callbacks });
+    } else if (engine.adapter === EngineAdapter.ANTIGRAVITY) {
+      const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
+      const args = planAntigravityArgs({ autonomy: creature.autonomy, addDirs: [creature.dir, ...creature.addDirs], conversationId: agySession });
+      // A resumed conversation already holds the creature's instructions; don't pay for them again.
+      const fullPrompt = agySession ? prompt : `${systemPrompt}\n\n---\n\n${prompt}`;
+      handle = runAntigravity({ bin: engine.bin, args: [...engine.args, ...args], prompt: fullPrompt, cwd, env: this.env(), timeoutMs, callbacks });
     } else {
       const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
       handle = runCli({ bin: engine.bin, args: engine.args, prompt, systemPrompt, cwd, env: this.env(), timeoutMs, callbacks });
@@ -265,7 +281,7 @@ export class Hq {
       const message = outcome.timedOut
         ? `Stopped after ${this.profile.guard.fullAutoMaxMinutes} minutes (full-auto time limit).`
         : outcome.error ?? 'The engine stopped with an unknown error.';
-      if (/No conversation found|session/i.test(message) && options.resume) this.quests.clearSession(sessionKey);
+      if (/No conversation found|session|conversation/i.test(message) && options.resume) this.quests.clearSession(sessionKey);
       if (AUTH_ERROR_PATTERN.test(message)) void this.refreshAuth();
       this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: message });
       this.quests.setStatus(quest.id, QuestStatus.FAILED);
@@ -339,24 +355,34 @@ export class Hq {
   }
 
   private proposeNotes(creature: CreatureType, questId: string): void {
-    if (!this.profile.daycareAutoPropose) return;
+    const mode = this.profile.daycareMode;
+    if (mode === DaycareMode.OFF) return;
     const quest = this.quests.get(questId);
     if (!quest || quest.events.length < 2) return;
+    const save = (items: ProposalType[]): void => {
+      const ids = writeProposals(this.profile.vault, creature, quest, items);
+      if (ids.length === 0) return;
+      const autoApprove = this.profile.daycareAutoApproveFullAuto && creature.autonomy === Autonomy.FULL_AUTO && !creature.learnsReview;
+      if (autoApprove) ids.forEach((id) => this.decideDaycare({ id, action: DaycareAction.APPROVE }));
+      this.emit();
+    };
+    if (mode === DaycareMode.FREE) {
+      save(inlineProposals(this.profile.vault, creature, quest));
+      return;
+    }
+    if (!worthReviewing(quest)) return;
     const engine = this.profile.engines.claude;
     const handle = runClaude({
       bin: engine.bin,
-      args: ['-p', '--output-format', 'stream-json', '--verbose', '--tools', ''],
+      // Runs after every chat that did real work, so keep it on the cheapest model.
+      args: ['-p', '--output-format', 'stream-json', '--verbose', '--tools', '', '--model', DAYCARE_MODEL],
       prompt: buildProposalPrompt(creature, quest),
       cwd: this.profile.vault,
       env: this.env(),
       callbacks: { onEvent: () => undefined },
     });
     void handle.done.then((outcome) => {
-      if (!outcome.ok) return;
-      const ids = writeProposals(this.profile.vault, creature, quest, outcome.resultText);
-      const autoApprove = this.profile.daycareAutoApproveFullAuto && creature.autonomy === Autonomy.FULL_AUTO && !creature.learnsReview;
-      if (autoApprove) ids.forEach((id) => this.decideDaycare({ id, action: DaycareAction.APPROVE }));
-      this.emit();
+      if (outcome.ok) save(parseProposals(outcome.resultText));
     });
   }
 
