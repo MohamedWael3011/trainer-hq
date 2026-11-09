@@ -124,7 +124,49 @@ my-vault/sprites/overrides/
 | Backend guard | *(hatch one)* | Steelix | iron-hard foundations |
 | Idle sleeper | Dozer | Snorlax | naps when nothing is running |
 
-**4. Keep it private.** Pokémon names and sprites belong to Nintendo, Game Freak and The Pokémon Company. Use art you're allowed to use, keep it in your own vault for personal use, and **don't commit it to this repo or share builds that include it**. PRs that add copyrighted art will be closed; freely licensed creature art is very welcome (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+**4. Get sprites from Pokémon Showdown.** [Pokémon Showdown](https://play.pokemonshowdown.com/) serves pixel sprites by lowercase name, and the gen 5 ones match Trainer HQ's look best:
+
+| Kind | URL pattern | Example |
+|---|---|---|
+| Animated GIF (best) | `https://play.pokemonshowdown.com/sprites/gen5ani/<name>.gif` | `.../gen5ani/porygon.gif` |
+| Still PNG (fallback) | `https://play.pokemonshowdown.com/sprites/gen5/<name>.png` | `.../gen5/porygon.png` |
+
+Names are lowercase with punctuation removed (`mr. mime` → `mrmime`, `farfetch'd` → `farfetchd`); forms add a suffix such as `rotom-wash`. Save each file as `<creature-id>.gif` (or `.png`) in your vault's `sprites/overrides/`. Trainer HQ picks it up immediately, and an override always wins over the creature's `sprite:` line, so leave that line as it is.
+
+```bash
+cd ~/Documents/my-vault/sprites/overrides
+curl -fLo scout.gif https://play.pokemonshowdown.com/sprites/gen5ani/porygon.gif
+curl -fLo dozer.gif https://play.pokemonshowdown.com/sprites/gen5ani/snorlax.gif
+```
+
+**5. Or let Claude do it.** Paste this into Claude Code (or a Trainer HQ creature with write access to your vault), replacing the vault path and the cast:
+
+```text
+Turn my Trainer HQ party into Pokémon. My vault is ~/Documents/my-vault.
+
+Cast (creature id → Pokémon):
+- scout → Porygon
+- reviewer → Rotom
+- pixel → Smeargle
+- sage → Alakazam
+- scribe → Ditto
+- dozer → Snorlax (the idle sleeper, no creature.yaml)
+
+For each one:
+1. If party/<id>/creature.yaml exists, change only its name: line to the Pokémon's name. Keep id, role, tools and everything else exactly as they are.
+2. Download its Pokémon Showdown sprite into sprites/overrides/<id>.gif from
+   https://play.pokemonshowdown.com/sprites/gen5ani/<lowercase-name>.gif
+   If that 404s, download https://play.pokemonshowdown.com/sprites/gen5/<lowercase-name>.png as <id>.png instead.
+   Lowercase the name and strip punctuation (mr. mime → mrmime).
+3. Check each file is a real image (not an HTML error page) and delete it if not.
+
+Don't touch any file outside party/*/creature.yaml and sprites/overrides/.
+Finish with a table of creature id, new name, sprite file and size.
+```
+
+Hatch new creatures later with a Pokémon name in mind ("a squad-memory creature called Noctowl") and run step 2 for them.
+
+**6. Keep it private.** Pokémon names and sprites belong to Nintendo, Game Freak and The Pokémon Company. Use art you're allowed to use, keep it in your own vault for personal use, and **don't commit it to this repo or share builds that include it**. PRs that add copyrighted art will be closed; freely licensed creature art is very welcome (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Concepts
 
