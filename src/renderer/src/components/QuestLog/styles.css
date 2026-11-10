@@ -1,4 +1,4 @@
-.ql { display: grid; gap: 10px; }
+.ql { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
 .ql-me { justify-self: end; max-width: 72ch; background: var(--accent); color: var(--accent-ink); padding: 8px 13px; border-radius: 15px 15px 4px 15px; font-weight: 600; white-space: pre-wrap; }
 .ql-bot { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; max-width: 86ch; }
 .ql-avatar { width: 30px; height: 30px; margin-top: 2px; }

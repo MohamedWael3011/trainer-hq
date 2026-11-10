@@ -1,0 +1,7 @@
+.cc { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.cc-field { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-3); }
+.cc-field select { height: 26px; max-width: 190px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface); color: var(--fg); font-size: 12px; cursor: pointer; transition: border-color 150ms ease; }
+.cc-field select:focus-visible { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cc-field select:disabled { opacity: 0.6; cursor: progress; }
+.cc-field select.cc-full { border-color: color-mix(in srgb, var(--violet) 55%, transparent); color: var(--violet); }
+@media (hover: hover) and (pointer: fine) { .cc-field select:hover { border-color: var(--fg-3); } }

@@ -48,11 +48,23 @@ export class Windows {
   notch!: BrowserWindow;
   dashboard: BrowserWindow | undefined;
   private lastOverlayAt = 0;
+  private interactive = new Set<SurfaceType>();
   private dockWanted = true;
   private fullscreen = false;
 
+  // Clicking or typing in the notch or dock can activate the app, which macOS reports as a
+  // reopen. Treat the overlays as "in use" while the pointer is over them or they have focus,
+  // and for a short grace period after, so that activation never pops the dashboard open.
   recentlyUsedOverlay(): boolean {
+    if (this.interactive.size > 0) return true;
+    if ([this.notch, this.dock].some((win) => win && !win.isDestroyed() && win.isFocused())) return true;
     return Date.now() - this.lastOverlayAt < OVERLAY_ACTIVATE_GRACE_MS;
+  }
+
+  private trackOverlay(win: BrowserWindow): void {
+    const mark = (): void => { this.lastOverlayAt = Date.now(); };
+    win.on('focus', mark);
+    win.on('blur', mark);
   }
 
   private dockBounds(size: DockSizeType): Electron.Rectangle {
@@ -80,6 +92,7 @@ export class Windows {
     this.dock.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
     this.dock.setIgnoreMouseEvents(true, { forward: true });
     load(this.dock, Surface.DOCK);
+    this.trackOverlay(this.dock);
     this.dockWanted = !dockHidden;
     this.dock.once('ready-to-show', () => {
       if (this.dockWanted && !this.fullscreen) this.dock.showInactive();
@@ -97,6 +110,7 @@ export class Windows {
     this.notch.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
     this.notch.setIgnoreMouseEvents(true, { forward: true });
     load(this.notch, Surface.NOTCH);
+    this.trackOverlay(this.notch);
     this.notch.once('ready-to-show', () => {
       if (!this.fullscreen) this.notch.showInactive();
     });
@@ -129,6 +143,7 @@ export class Windows {
     if (this.notch.isDestroyed()) return;
     if (fullscreen) {
       this.notch.setIgnoreMouseEvents(true, { forward: true });
+      this.interactive.delete(Surface.NOTCH);
       this.notch.hide();
     } else if (!this.notch.isVisible()) {
       this.notch.showInactive();
@@ -143,6 +158,7 @@ export class Windows {
       this.dock.webContents.send(Ipc.DOCK_EXPAND);
     } else {
       this.dock.setIgnoreMouseEvents(true, { forward: true });
+      this.interactive.delete(Surface.DOCK);
       this.dock.hide();
     }
   }
@@ -151,6 +167,8 @@ export class Windows {
     const win = surface === Surface.NOTCH ? this.notch : surface === Surface.DOCK ? this.dock : undefined;
     if (!win) return;
     this.lastOverlayAt = Date.now();
+    if (interactive) this.interactive.add(surface);
+    else this.interactive.delete(surface);
     win.setIgnoreMouseEvents(!interactive, { forward: true });
     if (!interactive && surface === Surface.NOTCH && this.fullscreen) {
       win.hide();

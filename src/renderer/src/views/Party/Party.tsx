@@ -7,6 +7,7 @@ import QuestLog from '../../components/QuestLog/QuestLog';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
 import AttachmentChip from '../../components/AttachmentChip/AttachmentChip';
 import ThreadSheet from '../ThreadSheet/ThreadSheet';
+import CreatureControls from '../../components/CreatureControls/CreatureControls';
 import { renderIf } from '../../lib/renderIf';
 import { AUTONOMY_INFO, creatureById, isLive } from '../../lib/format';
 import './styles.css';
@@ -170,8 +171,7 @@ const Party = ({ state, creatureId }: PropsType) => {
           <h2>{creature.name}</h2>
           <p className="muted">{creature.role}</p>
           <div className="party-meta">
-            <Badge>{creature.engine}</Badge>
-            <Badge tone={autonomy.tone}>{autonomy.label}</Badge>
+            <CreatureControls state={state} creature={creature} />
             {renderIf(!!creature.cwd, <Badge>{creature.cwd?.split('/').pop()}</Badge>)}
           </div>
         </div>

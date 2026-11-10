@@ -51,7 +51,7 @@ import { checkPrerequisites } from './prereqs';
 import { loadCreatures, updateCreatureFile, watchVault } from './registry';
 import { clearOverride, resolveSprite, setOverride } from './sprites';
 import { loadUi, saveUi } from './ui';
-import { planAntigravityArgs, runAntigravity } from './engines/antigravity';
+import { listAntigravityModels, planAntigravityArgs, runAntigravity } from './engines/antigravity';
 
 const AGY_SESSION_PREFIX = 'agy:';
 const DAYCARE_MODEL = 'haiku';
@@ -168,6 +168,7 @@ export class Hq {
       daycare: listDaycare(this.profile.vault),
       repos: Object.keys(this.profile.repos),
       engines: Object.keys(this.profile.engines),
+      engineAdapters: Object.fromEntries(Object.entries(this.profile.engines).map(([name, engine]) => [name, engine.adapter])),
       spriteRev: this.spriteRev,
       stats: this.quests.stats(),
       usage: this.usage,
@@ -251,7 +252,7 @@ export class Hq {
       handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(), timeoutMs: plan.timeoutMs, callbacks });
     } else if (engine.adapter === EngineAdapter.ANTIGRAVITY) {
       const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
-      const args = planAntigravityArgs({ autonomy: creature.autonomy, addDirs: [creature.dir, ...creature.addDirs], conversationId: agySession });
+      const args = planAntigravityArgs({ autonomy: creature.autonomy, model: creature.model, addDirs: [creature.dir, ...creature.addDirs], conversationId: agySession });
       // A resumed conversation already holds the creature's instructions; don't pay for them again.
       const fullPrompt = agySession ? prompt : `${systemPrompt}\n\n---\n\n${prompt}`;
       handle = runAntigravity({ bin: engine.bin, args: [...engine.args, ...args], prompt: fullPrompt, cwd, env: this.env(), timeoutMs, callbacks });
@@ -423,6 +424,14 @@ export class Hq {
   setAutonomy(creatureId: string, autonomy: AutonomyType): void {
     updateCreatureFile(this.creature(creatureId), { autonomy });
     this.reloadVault();
+  }
+
+  // Models a creature can pick for its engine. Claude's short list lives in the renderer;
+  // engines that can list their own models (Antigravity) are asked. null = no picker.
+  async engineModels(engineName: string): Promise<{ id: string; label: string }[] | null> {
+    const engine = this.profile.engines[engineName];
+    if (!engine || engine.adapter !== EngineAdapter.ANTIGRAVITY) return null;
+    return listAntigravityModels(engine.bin, this.env());
   }
 
   setModel(creatureId: string, model: string): void {

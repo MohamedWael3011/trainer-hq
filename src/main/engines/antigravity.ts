@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { createInterface } from 'readline';
 import { Autonomy, EventKind, type AutonomyType } from '@shared/constants';
 import type { RunCallbacksType, RunHandleType, RunOutcomeType } from './types';
@@ -145,4 +145,31 @@ export const runAntigravity = (options: {
   });
 
   return { cancel: () => { cancelled = true; child.kill('SIGTERM'); }, done };
+};
+
+export type EngineModelType = { id: string; label: string };
+
+const MODELS_TIMEOUT_MS = 30_000;
+const modelCache = new Map<string, Promise<EngineModelType[]>>();
+
+// `agy models` prints "<id>\t<label>" per line. The list changes with Antigravity releases,
+// so ask the CLI instead of hard-coding it, and cache it for the session.
+export const listAntigravityModels = (bin: string, env: NodeJS.ProcessEnv): Promise<EngineModelType[]> => {
+  const cached = modelCache.get(bin);
+  if (cached) return cached;
+  const pending = new Promise<EngineModelType[]>((resolve) => {
+    execFile(bin, ['models'], { env, timeout: MODELS_TIMEOUT_MS }, (error, stdout) => {
+      if (error) {
+        modelCache.delete(bin);
+        resolve([]);
+        return;
+      }
+      resolve(stdout.split('\n')
+        .map((line) => line.split('\t'))
+        .filter((parts) => parts.length >= 2 && parts[0].trim() && !/\s/.test(parts[0].trim()))
+        .map(([id, label]) => ({ id: id.trim(), label: label.trim() })));
+    });
+  });
+  modelCache.set(bin, pending);
+  return pending;
 };

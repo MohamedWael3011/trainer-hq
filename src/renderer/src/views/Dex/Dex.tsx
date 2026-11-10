@@ -1,10 +1,11 @@
 import { useCallback, type ChangeEvent } from 'react';
-import { Autonomy, CLAUDE_MODELS, type AutonomyType } from '@shared/constants';
+import { Autonomy, CLAUDE_MODELS, EngineAdapter, type AutonomyType } from '@shared/constants';
 import type { AppStateType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
 import { renderIf } from '../../lib/renderIf';
-import { AUTONOMY_INFO, creatureById } from '../../lib/format';
+import { creatureById } from '../../lib/format';
+import { autonomyText, defaultVariant, useModelChoices } from '../../lib/engines';
 import './styles.css';
 
 type PropsType = {
@@ -16,6 +17,7 @@ const AUTONOMY_ORDER: AutonomyType[] = [Autonomy.ASK, Autonomy.AUTO_EDIT, Autono
 
 const Dex = ({ state, creatureId }: PropsType) => {
   const creature = creatureById(state, creatureId);
+  const models = useModelChoices(state, creature);
   const onSprite = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && creature) void window.hq.setSprite(creature.id, file);
@@ -24,9 +26,9 @@ const Dex = ({ state, creatureId }: PropsType) => {
 
   if (!creature) return <div className="dex-empty">No creature selected.</div>;
   const isFull = creature.autonomy === Autonomy.FULL_AUTO;
-  const isClaude = creature.engine === 'claude';
-  const currentModel = creature.model ?? '';
-  const isCustomModel = !CLAUDE_MODELS.some((option) => option.id === currentModel);
+  const isClaude = models.adapter === EngineAdapter.CLAUDE;
+  const currentModel = models.current;
+  const currentFamily = models.family;
 
   return (
     <section className="dex">
@@ -53,7 +55,7 @@ const Dex = ({ state, creatureId }: PropsType) => {
         <div className="eyebrow">Autonomy</div>
         <div className="dex-auto">
           {AUTONOMY_ORDER.map((level) => {
-            const info = AUTONOMY_INFO[level];
+            const info = autonomyText(level, models.adapter);
             return (
               <button
                 key={level}
@@ -68,7 +70,18 @@ const Dex = ({ state, creatureId }: PropsType) => {
             );
           })}
         </div>
-        {renderIf(isFull, (
+        {renderIf(isFull && !isClaude, (
+          <div className="dex-guard dex-guard-warn">
+            <b>Claude's guard doesn't cover this engine</b>
+            <ul>
+              <li>{models.adapter === EngineAdapter.ANTIGRAVITY ? 'Antigravity runs with every permission granted' : 'The CLI runs with its own permission defaults'}</li>
+              <li>Your deny list, worktrees and the plan-usage pause don't apply</li>
+              <li>It still stops at your profile's time limit per quest</li>
+              <li>Stop any quest from the notch with ⌘ .</li>
+            </ul>
+          </div>
+        ))}
+        {renderIf(isFull && isClaude, (
           <div className="dex-guard">
             <b>Full auto still runs inside the guard</b>
             <ul>
@@ -117,7 +130,37 @@ const Dex = ({ state, creatureId }: PropsType) => {
               </button>
             ))}
           </div>
-          {renderIf(isCustomModel, <p className="muted">Using <code>{currentModel}</code> from creature.yaml.</p>)}
+          {renderIf(models.custom, <p className="muted">Using <code>{currentModel}</code> from creature.yaml.</p>)}
+        </div>
+      ))}
+
+      {renderIf(!isClaude && models.families.length > 0, (
+        <div className="dex-block">
+          <div className="eyebrow">Model</div>
+          <div className="dex-engine">
+            <button className="btn sm ghost dex-engine-opt" aria-pressed={!currentModel} onClick={() => void window.hq.setModel(creature.id, '')}>Default</button>
+            {models.families.map((family) => (
+              <button
+                key={family.name}
+                className="btn sm ghost dex-engine-opt"
+                aria-pressed={currentFamily?.name === family.name}
+                onClick={() => void window.hq.setModel(creature.id, defaultVariant(family))}
+              >
+                {family.name}
+              </button>
+            ))}
+          </div>
+          {renderIf(!!currentFamily && currentFamily.variants.length > 1, (
+            <div className="dex-effort">
+              <span className="faint">Effort</span>
+              <div className="seg">
+                {currentFamily?.variants.map((variant) => (
+                  <button key={variant.id} type="button" aria-pressed={variant.id === currentModel} onClick={() => void window.hq.setModel(creature.id, variant.id)}>{variant.effort || variant.id}</button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {renderIf(!!currentModel && !currentFamily, <p className="muted">Using <code>{currentModel}</code> from creature.yaml.</p>)}
         </div>
       ))}
 

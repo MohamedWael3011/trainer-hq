@@ -1,5 +1,7 @@
-.md { display: grid; gap: 10px; line-height: 1.7; overflow-wrap: anywhere; min-width: 0; }
-.md > * { margin: 0; }
+.md { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; line-height: 1.7; overflow-wrap: anywhere; min-width: 0; }
+/* Grid cells otherwise grow to their widest line (e.g. a code block inside a list) and push past the bubble. */
+.md > *, .md li { margin: 0; min-width: 0; max-width: 100%; }
+.md img { max-width: 100%; height: auto; }
 .md h1, .md h2, .md h3, .md h4 { font-size: 13px; font-weight: 700; color: var(--fg); margin-top: 4px; }
 .md h1 { font-size: 15px; }
 .md h2 { font-size: 14px; }
@@ -7,7 +9,7 @@
 .md strong { color: var(--fg); font-weight: 700; }
 .md em { color: var(--fg-2); }
 .md a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
-.md ul, .md ol { padding-left: 20px; display: grid; gap: 4px; }
+.md ul, .md ol { padding-left: 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
 .md li::marker { color: var(--accent); }
 .md li > p { margin: 0; }
 .md blockquote { margin: 0; padding: 4px 12px; border-left: 3px solid var(--violet); color: var(--fg-2); background: color-mix(in srgb, var(--violet) 7%, transparent); border-radius: 0 8px 8px 0; }
@@ -16,6 +18,8 @@
   padding: 1px 6px; border-radius: 6px; font-size: 0.95em;
   color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
 }
+.md-path { cursor: pointer; }
+@media (hover: hover) and (pointer: fine) { .md-path:hover { text-decoration: underline; text-underline-offset: 3px; } }
 .md-code { border-radius: 12px; overflow: hidden; background: var(--code-bg); border: 1px solid rgba(255, 255, 255, 0.06); }
 .md-code-bar { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px 5px 12px; font-size: 11px; color: #9a8aab; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
 .md-copy { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; color: #ffd1e8; background: rgba(255, 255, 255, 0.06); transition: background-color 150ms ease, transform 160ms var(--ease-out); }

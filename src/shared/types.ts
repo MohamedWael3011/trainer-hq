@@ -155,6 +155,7 @@ export type AppStateType = {
   daycare: DaycareNoteType[];
   repos: string[];
   engines: string[];
+  engineAdapters: Record<string, EngineAdapterType>;
   spriteRev: Record<string, number>;
   stats: StatsType;
   usage?: UsageType;

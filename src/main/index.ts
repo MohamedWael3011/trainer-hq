@@ -7,6 +7,7 @@ import { pathToFileURL } from 'url';
 import { inspectAttachment, savePastedFile } from './attachments';
 import { loadLoginShellPath } from './env';
 import { watchFullscreen } from './fullscreen';
+import { openLocal } from './links';
 import { resourcesDir } from './paths';
 import { Hq } from './hq';
 import { registerSpriteProtocol } from './sprites';
@@ -33,6 +34,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.CREATURE_AUTONOMY, (_event, id: string, autonomy: AutonomyType) => hq.setAutonomy(id, autonomy));
   ipcMain.handle(Ipc.CREATURE_MODEL, (_event, id: string, model: string) => hq.setModel(id, model));
   ipcMain.handle(Ipc.CREATURE_ENGINE, (_event, id: string, engine: string) => hq.setEngine(id, engine));
+  ipcMain.handle(Ipc.ENGINE_MODELS, (_event, engine: string) => hq.engineModels(engine));
   ipcMain.handle(Ipc.CREATURE_SPRITE, (_event, id: string, path: string) => hq.setSprite(id, path));
   ipcMain.handle(Ipc.CREATURE_SPRITE_RESET, (_event, id: string) => hq.resetSprite(id));
   ipcMain.handle(Ipc.DAYCARE_DECIDE, (_event, decision: DaycareDecisionType) => hq.decideDaycare(decision));
@@ -64,6 +66,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string) => windows.openDashboard(creatureId));
   ipcMain.handle(Ipc.SURFACE_INTERACTIVE, (_event, surface: SurfaceType, interactive: boolean) => windows.setInteractive(surface, interactive));
   ipcMain.handle(Ipc.OPEN_PATH, (_event, target?: string) => shell.openPath(target ?? hq.vaultPath()));
+  ipcMain.handle(Ipc.OPEN_LOCAL, (_event, target: string, baseDir?: string) => openLocal(target, [baseDir, hq.vaultPath()].filter((dir): dir is string => !!dir)));
   ipcMain.handle(Ipc.LOGIN_ITEM_GET, () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle(Ipc.NOTCH_METRICS, () => windows.notchMetrics());
   ipcMain.handle(Ipc.ATTACHMENT_INSPECT, (_event, path: string) => inspectAttachment(path));

@@ -33,7 +33,7 @@ const HandoffCard = ({ state, quest }: PropsType) => {
       <div className="handoff-body" data-open={open}>
         <div className="handoff-inner">
           <p className="handoff-question selectable">{question}</p>
-          {renderIf(!!answer && !live, <div className="handoff-answer">{answer ? <Markdown text={answer} /> : null}</div>)}
+          {renderIf(!!answer && !live, <div className="handoff-answer">{answer ? <Markdown text={answer} baseDir={quest.cwd} /> : null}</div>)}
           <button className="handoff-open" onClick={() => void window.hq.openDashboard(quest.creatureId)}>Open {name}'s chat</button>
         </div>
       </div>

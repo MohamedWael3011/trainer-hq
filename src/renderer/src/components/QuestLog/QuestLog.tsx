@@ -40,7 +40,7 @@ const QuestLog = ({ state, quest }: PropsType) => {
       return (
         <div key={index} className="ql-bot">
           <Sprite state={state} id={quest.creatureId} className="ql-avatar" />
-          <div className="ql-bubble"><Markdown text={event.text} /></div>
+          <div className="ql-bubble"><Markdown text={event.text} baseDir={quest.cwd} /></div>
         </div>
       );
     })}
