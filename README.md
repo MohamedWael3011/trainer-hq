@@ -35,13 +35,13 @@ Hover the notch, or press <kbd>⌥ Space</kbd>, pick a creature (<kbd>⇥</kbd> 
 
 ### The party
 
-Every creature has a chat with Markdown, code blocks and tables, plus **threads** for separate contexts (a branch or a PR in its own git worktree).
+Every creature has a chat with Markdown, code blocks and tables, inline engine/model/autonomy controls, per-reply token and cost usage, plus **threads** for separate contexts (a branch or a PR in its own git worktree).
 
 <img src="docs/media/party-chat.png" width="760" alt="A chat with Scout showing a formatted answer with a table and a code block">
 
 ### The Dex
 
-See what a creature knows, change its sprite, and choose its autonomy: **ask every time**, **auto-edit**, or **full auto** inside a guard that never pushes, merges or resets.
+See what a creature knows, change its sprite, pick its engine and model (with plan-cost labels from Fable down to Haiku), and choose its autonomy: **ask every time**, **auto-edit**, or **full auto** inside a guard that never pushes, merges or resets.
 
 <img src="docs/media/dex.png" width="760" alt="The Dex showing a creature's sprite, autonomy options and brain notes">
 
@@ -60,8 +60,8 @@ A short onboarding checks your tools, sets up your vault and repos, and introduc
 | **Threads** | Several contexts per creature, each its own Claude session; point one at a branch or PR and it works in an isolated worktree. |
 | **Handoffs** | `ask_creature`: creatures call teammates and get answers back, with chain limits and timeouts. |
 | **Autonomy + guard** | Ask / auto-edit / full auto. Full auto keeps a deny list, a time limit and worktrees, and pauses near your plan's usage limit. |
-| **Day Care** | After each chat, suggested notes wait for your approval before they reach the brain. |
-| **Engines** | Claude Code by default; any CLI agent (Gemini CLI, Antigravity, …) through a generic adapter. |
+| **Tiered brain + Day Care** | Core rules (`01-workspace.md`, `how-i-work.md`, or `tier: hot`) stay inline; deeper domain notes and `## Learned` history are indexed with section line ranges and pulled on demand. Day Care proposes new notes for free at the end of each chat. |
+| **Engines, models & cost** | Claude Code and Antigravity (`agy`) with model & effort pickers, plan-use labels, and per-reply token/cache/cost badges under every quest; any other CLI agent plugs in through a generic adapter. |
 | **Attachments** | Drop or paste files: their paths go into the message, zips are unpacked, and skill zips install in one click. |
 | **Profiles** | One vault per profile (work, personal…), each optionally with its own Claude account. |
 | **Lab** *(optional)* | Plug in a render-harness skill to screenshot your app's real screens and hand them to a design-audit creature. |
@@ -180,13 +180,13 @@ my-vault/
 ├─ party/
 │  └─ scout/
 │     ├─ creature.yaml     who it is and what it may do
-│     ├─ brain/*.md        what it knows (loaded into its system prompt)
+│     ├─ brain/*.md        hot core rules inline + deep notes indexed by section & line range
 │     └─ skills/<name>/SKILL.md   optional local skills
 ├─ daycare/inbox/          suggested notes waiting for your approval
 └─ sprites/overrides/      your own sprites, named <creature-id>.png|gif|webp
 ```
 
-Open it in Obsidian (**Open folder as vault**) to browse and edit the brain. Edits apply on the next message.
+Open it in Obsidian (**Open folder as vault**) to browse and edit the brain. Core workspace/rule notes (`01-workspace.md`, `workspace.md`, `how-i-work.md`, `my-style.md`, `scope.md`, or any note with `tier: hot` in YAML frontmatter) are inlined into the system prompt; all other domain notes and `## Learned` entries are listed as a compact index with `## Heading (Lstart-Lend)` spans so the creature reads only the lines a task needs. Edits apply on the next message.
 </details>
 
 <details>
