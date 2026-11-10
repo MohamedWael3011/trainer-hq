@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'child_process';
 import { createInterface } from 'readline';
 import { Autonomy, EventKind, type AutonomyType } from '@shared/constants';
+import type { QuestUsageType } from '@shared/types';
 import type { RunCallbacksType, RunHandleType, RunOutcomeType } from './types';
 
 const STDERR_KEEP = 4000;
@@ -78,13 +79,19 @@ export const runAntigravity = (options: {
   let cancelled = false;
   let timedOut = false;
   let sessionSent = false;
+  let streamedOutChars = 0;
+  const modelFlagIdx = args.indexOf('--model');
+  const activeModel = modelFlagIdx >= 0 ? args[modelFlagIdx + 1] : undefined;
   const texts = new Map<number, string>();
   const timer = timeoutMs ? setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs) : undefined;
 
   const flushText = (index: number): void => {
     const text = texts.get(index)?.trim();
     texts.delete(index);
-    if (text) callbacks.onEvent({ kind: EventKind.TEXT, text });
+    if (text) {
+      streamedOutChars += text.length;
+      callbacks.onEvent({ kind: EventKind.TEXT, text });
+    }
   };
 
   child.stderr.on('data', (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-STDERR_KEEP); });
@@ -131,6 +138,18 @@ export const runAntigravity = (options: {
       [...texts.keys()].forEach(flushText);
       const quietFailure = code === 0 && !resultText && stderr.trim() ? friendly(stderr.trim()) : undefined;
       const error = spawnError?.message ?? resultError ?? quietFailure ?? (code === 0 ? undefined : stderr.trim() || `${bin} exited with code ${code}`);
+      const outChars = Math.max(streamedOutChars, resultText.length);
+      const usage: QuestUsageType | undefined =
+        outChars > 0 || prompt.length > 0
+          ? {
+              inputTokens: Math.max(1, Math.round(prompt.length / 4)),
+              outputTokens: Math.max(1, Math.round(outChars / 4)),
+              cacheReadTokens: 0,
+              cacheWriteTokens: 0,
+              model: activeModel,
+            }
+          : undefined;
+      if (usage) callbacks.onQuestUsage?.(usage);
       resolve({
         ok: !error && !cancelled && !timedOut,
         resultText,
@@ -138,6 +157,7 @@ export const runAntigravity = (options: {
         usageLimited: !!error && USAGE_LIMIT_PATTERN.test(error),
         cancelled,
         timedOut,
+        usage,
       });
     };
     child.on('error', (error) => finish(null, error));
@@ -164,9 +184,10 @@ export const listAntigravityModels = (bin: string, env: NodeJS.ProcessEnv): Prom
         resolve([]);
         return;
       }
-      resolve(stdout.split('\n')
-        .map((line) => line.split('\t'))
-        .filter((parts) => parts.length >= 2 && parts[0].trim() && !/\s/.test(parts[0].trim()))
+      resolve(stdout.split(/[\r\n]+/)
+        .map((line) => line.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').trim())
+        .map((line) => line.split(/\t|\s{2,}/))
+        .filter((parts) => parts.length >= 2 && parts[0].trim() && !/\s/.test(parts[0].trim()) && /^[a-z0-9]/i.test(parts[0].trim()))
         .map(([id, label]) => ({ id: id.trim(), label: label.trim() })));
     });
   });

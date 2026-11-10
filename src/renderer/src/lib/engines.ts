@@ -4,11 +4,37 @@ import type { AppStateType, CreatureType } from '@shared/types';
 import { AUTONOMY_INFO } from './format';
 
 export type ModelChoiceType = { id: string; label: string; desc?: string };
-export type ModelFamilyType = { name: string; optionLabel?: string; variants: { id: string; effort: string }[] };
+export type ModelFamilyType = {
+  name: string;
+  optionLabel?: string;
+  desc?: string;
+  cost?: string;
+  variants: { id: string; effort: string }[];
+};
 
 // "Gemini 4 Argon (High)" -> family "Gemini 4 Argon", effort "High".
 const EFFORT_LABEL = /^(.*?)\s*\(([^)]+)\)\s*$/;
 const EFFORT_ORDER = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+const familyHint = (name: string): { desc: string; cost: string; optionLabel: string } => {
+  const lower = name.toLowerCase();
+  if (lower.includes('fable')) {
+    return { desc: 'Most capable · uses your plan fastest', cost: 'Highest quota use', optionLabel: `${name} · most capable, uses quota fastest` };
+  }
+  if (lower.includes('opus')) {
+    return { desc: 'Deep reasoning · heavy quota use', cost: 'High quota use', optionLabel: `${name} · deep reasoning, high quota use` };
+  }
+  if (lower.includes('argon') || lower.includes('pro')) {
+    return { desc: 'Strong coding & reasoning', cost: 'Medium-high quota use', optionLabel: `${name} · strong reasoning` };
+  }
+  if (lower.includes('sonnet')) {
+    return { desc: 'Balanced speed and smarts', cost: 'Medium quota use', optionLabel: `${name} · balanced` };
+  }
+  if (lower.includes('flash') || lower.includes('haiku') || lower.includes('lite')) {
+    return { desc: 'Fastest · lightest on quota', cost: 'Cheapest', optionLabel: `${name} · fastest, cheapest` };
+  }
+  return { desc: 'General purpose model', cost: 'Standard quota use', optionLabel: name };
+};
 
 export const adapterOf = (state: AppStateType, engine: string): EngineAdapterType =>
   state.engineAdapters?.[engine] ?? (engine === 'claude' ? EngineAdapter.CLAUDE : EngineAdapter.CLI);
@@ -18,7 +44,8 @@ const toFamilies = (models: ModelChoiceType[]): ModelFamilyType[] => {
   models.forEach((model) => {
     const match = EFFORT_LABEL.exec(model.label);
     const name = match ? match[1] : model.label;
-    const family = families.get(name) ?? { name, variants: [] };
+    const hint = familyHint(name);
+    const family = families.get(name) ?? { name, ...hint, variants: [] };
     family.variants.push({ id: model.id, effort: match ? match[2] : '' });
     families.set(name, family);
   });
@@ -34,6 +61,8 @@ export const defaultVariant = (family: ModelFamilyType): string =>
 const CLAUDE_FAMILIES: ModelFamilyType[] = CLAUDE_MODELS.filter((model) => model.id).map((model) => ({
   name: model.label,
   optionLabel: model.optionLabel,
+  desc: model.desc,
+  cost: model.cost,
   variants: [{ id: model.id, effort: '' }],
 }));
 

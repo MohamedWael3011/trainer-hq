@@ -138,16 +138,22 @@ const Dex = ({ state, creatureId }: PropsType) => {
       {renderIf(!isClaude && models.families.length > 0, (
         <div className="dex-block">
           <div className="eyebrow">Model</div>
-          <div className="dex-engine">
-            <button className="btn sm ghost dex-engine-opt" aria-pressed={!currentModel} onClick={() => void window.hq.setModel(creature.id, '')}>Default</button>
+          <div className="dex-auto dex-model">
+            <button className="dex-auto-opt" aria-pressed={!currentModel} onClick={() => void window.hq.setModel(creature.id, '')}>
+              <b>Default</b>
+              <span>Follows your CLI setting</span>
+              <code>CLI default</code>
+            </button>
             {models.families.map((family) => (
               <button
                 key={family.name}
-                className="btn sm ghost dex-engine-opt"
+                className="dex-auto-opt"
                 aria-pressed={currentFamily?.name === family.name}
                 onClick={() => void window.hq.setModel(creature.id, defaultVariant(family))}
               >
-                {family.name}
+                <b>{family.name}</b>
+                {renderIf(!!family.desc, <span>{family.desc}</span>)}
+                {renderIf(!!family.cost, <code>{family.cost}</code>)}
               </button>
             ))}
           </div>

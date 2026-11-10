@@ -40,7 +40,11 @@ const CreatureControls = ({ state, creature }: PropsType) => {
           <span>Model</span>
           <select value={familyValue} disabled={models.loading} onChange={(event) => onFamily(event.target.value)}>
             <option value={DEFAULT_MODEL}>
-              {models.loading ? 'Loading…' : models.adapter === EngineAdapter.CLAUDE ? CLAUDE_MODELS[0].optionLabel : 'Default'}
+              {models.loading
+                ? 'Loading…'
+                : models.adapter === EngineAdapter.CLAUDE
+                  ? CLAUDE_MODELS[0].optionLabel
+                  : 'Default · follows CLI setting'}
             </option>
             {models.families.map((family) => <option key={family.name} value={family.name}>{family.optionLabel ?? family.name}</option>)}
             {renderIf(models.custom, <option value={CUSTOM_MODEL}>{models.current}</option>)}
