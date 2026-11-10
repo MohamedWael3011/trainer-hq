@@ -189,6 +189,15 @@ const Party = ({ state, creatureId }: PropsType) => {
             );
           })}
           <button className="party-tab party-tab-add" onClick={() => setCreatingThread(true)}>+ Thread</button>
+          {renderIf(!thread && quests.length > 0, (
+            <button
+              className="btn sm ghost party-clear-btn"
+              onClick={() => void window.hq.clearThread(creature.id)}
+              title="Clear Main chat history and start a fresh session"
+            >
+              Clear
+            </button>
+          ))}
         </div>
         {renderIf(!!thread, thread ? (
           <div className="party-thread-info">
@@ -199,6 +208,7 @@ const Party = ({ state, creatureId }: PropsType) => {
             {renderIf(!!thread.note, <span className="faint">{thread.note}</span>)}
             <span className="party-thread-actions">
               {renderIf(!!thread.cwd, <button className="btn sm ghost" onClick={() => void window.hq.openPath(thread.cwd)}>Open folder</button>)}
+              {renderIf(quests.length > 0, <button className="btn sm ghost" onClick={() => void window.hq.clearThread(creature.id, thread.id)}>Clear</button>)}
               <button className="btn sm ghost" onClick={() => { void window.hq.archiveThread(thread.id, false); setThreadId(undefined); }}>Archive</button>
               {renderIf(!!thread.worktree, <button className="btn sm ghost danger" onClick={() => { void window.hq.archiveThread(thread.id, true); setThreadId(undefined); }}>Archive + remove worktree</button>)}
             </span>

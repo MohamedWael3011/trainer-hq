@@ -147,6 +147,7 @@ export const Ipc = {
   CREATURES_REORDER: 'creatures:reorder',
   THREAD_CREATE: 'thread:create',
   THREAD_ARCHIVE: 'thread:archive',
+  THREAD_CLEAR: 'thread:clear',
   LAB_STATE: 'lab:state',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SAVE: 'settings:save',

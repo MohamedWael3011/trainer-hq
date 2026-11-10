@@ -25,5 +25,6 @@
 .party-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .party-tab-live { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 20%, transparent); }
 .party-tab-add { color: var(--accent); font-weight: 700; }
+.party-clear-btn { margin-left: auto; align-self: center; margin-bottom: 4px; }
 .party-thread-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; font-size: 12px; }
 .party-thread-actions { margin-left: auto; display: flex; gap: 4px; }

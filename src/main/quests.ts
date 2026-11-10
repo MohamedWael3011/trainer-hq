@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { QuestStatus, type QuestKindType, type QuestStatusType } from '@shared/constants';
+import { QuestKind, QuestStatus, type QuestKindType, type QuestStatusType } from '@shared/constants';
 import type { QuestEventType, QuestType, QuestUsageType, StatsType } from '@shared/types';
 import { profileHome } from './paths';
 
@@ -116,6 +116,24 @@ export class QuestStore {
   clearSession(key: string): void {
     delete this.sessions[key];
     this.persist();
+  }
+
+  clearThread(creatureId: string, threadId?: string): string[] {
+    delete this.sessions[threadId ? `${creatureId}:${threadId}` : creatureId];
+    const targetIds = new Set(
+      this.quests
+        .filter((quest) => quest.creatureId === creatureId && (quest.kind === QuestKind.CHAT || quest.kind === QuestKind.HANDOFF) && quest.threadId === threadId)
+        .map((quest) => quest.id),
+    );
+    this.quests.forEach((quest) => {
+      if (quest.parentId && targetIds.has(quest.parentId)) targetIds.add(quest.id);
+    });
+    if (targetIds.size > 0) {
+      this.quests = this.quests.filter((quest) => !targetIds.has(quest.id));
+    }
+    this.persist();
+    this.onChange();
+    return Array.from(targetIds);
   }
 
   countLearned(count: number): void {

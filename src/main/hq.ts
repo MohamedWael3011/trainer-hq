@@ -409,7 +409,18 @@ export class Hq {
 
   archiveThread(id: string, removeWorktree: boolean): void {
     const thread = this.threads.get(id);
+    if (thread) this.quests.clearSession(threadKey(thread.creatureId, id));
     this.threads.archive(id, removeWorktree, thread?.repo ? this.profile.repos[thread.repo] : undefined);
+    this.emit();
+  }
+
+  clearThread(creatureId: string, threadId?: string): void {
+    const removedIds = this.quests.clearThread(creatureId, threadId);
+    removedIds.forEach((questId) => {
+      this.running.get(questId)?.cancel();
+      this.running.delete(questId);
+      this.approvals.denyAllForQuest(questId);
+    });
     this.emit();
   }
 

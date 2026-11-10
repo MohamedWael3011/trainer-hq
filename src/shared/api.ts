@@ -47,6 +47,7 @@ export type HqApiType = {
   reorderCreatures: (ids: string[]) => Promise<void>;
   createThread: (request: ThreadCreateRequestType) => Promise<string>;
   archiveThread: (id: string, removeWorktree: boolean) => Promise<void>;
+  clearThread: (creatureId: string, threadId?: string) => Promise<void>;
   onOpenView: (callback: (view: string) => void) => () => void;
   labState: () => Promise<LabStateType>;
   getSettings: () => Promise<ProfileSettingsType>;

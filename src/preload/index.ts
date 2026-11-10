@@ -55,6 +55,7 @@ const api: HqApiType = {
   reorderCreatures: (ids: string[]): Promise<void> => ipcRenderer.invoke(Ipc.CREATURES_REORDER, ids),
   createThread: (request: ThreadCreateRequestType): Promise<string> => ipcRenderer.invoke(Ipc.THREAD_CREATE, request),
   archiveThread: (id: string, removeWorktree: boolean): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_ARCHIVE, id, removeWorktree),
+  clearThread: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_CLEAR, creatureId, threadId),
   onOpenView: (callback: (view: string) => void) => subscribe(Ipc.OPEN_VIEW, callback),
   labState: (): Promise<LabStateType> => ipcRenderer.invoke(Ipc.LAB_STATE),
   getSettings: (): Promise<ProfileSettingsType> => ipcRenderer.invoke(Ipc.SETTINGS_GET),

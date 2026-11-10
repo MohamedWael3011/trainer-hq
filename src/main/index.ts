@@ -61,6 +61,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.LAB_CANCEL, (_event, jobId: string) => hq.lab.cancel(jobId));
   ipcMain.handle(Ipc.THREAD_CREATE, (_event, request: ThreadCreateRequestType) => hq.createThread(request));
   ipcMain.handle(Ipc.THREAD_ARCHIVE, (_event, id: string, removeWorktree: boolean) => hq.archiveThread(id, removeWorktree));
+  ipcMain.handle(Ipc.THREAD_CLEAR, (_event, creatureId: string, threadId?: string) => hq.clearThread(creatureId, threadId));
   ipcMain.handle(Ipc.AUTH_LOGIN, () => hq.openLogin());
   ipcMain.handle(Ipc.PROFILE_CREATE, (_event, request: ProfileCreateRequestType) => hq.createProfile(request));
   ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string) => windows.openDashboard(creatureId));
