@@ -6,7 +6,7 @@ import Badge from '../Badge/Badge';
 import Markdown from '../Markdown/Markdown';
 import HandoffCard from '../HandoffCard/HandoffCard';
 import { renderIf } from '../../lib/renderIf';
-import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive } from '../../lib/format';
+import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, questUsageSummary } from '../../lib/format';
 import './styles.css';
 
 type PropsType = {
@@ -23,6 +23,7 @@ const ASK_PREFIX = 'ask ';
 
 const QuestLog = ({ state, quest }: PropsType) => {
   const children = state.quests.filter((entry) => entry.parentId === quest.id).sort((a, b) => a.startedAt - b.startedAt);
+  const usage = questUsageSummary(quest);
   let childIndex = 0;
   return (
   <div className="ql">
@@ -47,6 +48,11 @@ const QuestLog = ({ state, quest }: PropsType) => {
     <div className="ql-meta">
       <Badge tone={STATUS_TONE[quest.status]} dot>{STATUS_LABEL[quest.status]}</Badge>
       <span className="faint">{duration(quest)}</span>
+      {renderIf(!!usage, (
+        <span className={`ql-usage${usage?.expensive ? ' ql-usage-warn' : ''}`} title={usage?.detail}>
+          {usage?.label}
+        </span>
+      ))}
       {renderIf(isLive(quest), <button className="btn sm ghost danger" onClick={() => void window.hq.cancelQuest(quest.id)}>Stop</button>)}
     </div>
   </div>

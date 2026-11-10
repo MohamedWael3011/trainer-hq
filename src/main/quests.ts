@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { QuestStatus, type QuestKindType, type QuestStatusType } from '@shared/constants';
-import type { QuestEventType, QuestType, StatsType } from '@shared/types';
+import type { QuestEventType, QuestType, QuestUsageType, StatsType } from '@shared/types';
 import { profileHome } from './paths';
 
 const QUESTS_FILE = 'quests.json';
@@ -99,6 +99,14 @@ export class QuestStore {
     quest.sessionId = sessionId;
     this.sessions[quest.threadId ? `${quest.creatureId}:${quest.threadId}` : quest.creatureId] = sessionId;
     this.persist();
+  }
+
+  setUsage(id: string, usage: QuestUsageType): void {
+    const quest = this.get(id);
+    if (!quest) return;
+    quest.usage = usage;
+    this.persist();
+    this.onChange();
   }
 
   sessionFor(key: string): string | undefined {

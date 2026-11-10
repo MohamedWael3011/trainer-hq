@@ -1,4 +1,4 @@
-import { Autonomy, type AutonomyType } from '@shared/constants';
+import { Autonomy, CLAUDE_MODELS, EngineAdapter, type AutonomyType } from '@shared/constants';
 import type { AppStateType, CreatureType } from '@shared/types';
 import { renderIf } from '../../lib/renderIf';
 import { autonomyText, defaultVariant, useModelChoices } from '../../lib/engines';
@@ -39,8 +39,10 @@ const CreatureControls = ({ state, creature }: PropsType) => {
         <label className="cc-field">
           <span>Model</span>
           <select value={familyValue} disabled={models.loading} onChange={(event) => onFamily(event.target.value)}>
-            <option value={DEFAULT_MODEL}>{models.loading ? 'Loading…' : 'Default'}</option>
-            {models.families.map((family) => <option key={family.name} value={family.name}>{family.name}</option>)}
+            <option value={DEFAULT_MODEL}>
+              {models.loading ? 'Loading…' : models.adapter === EngineAdapter.CLAUDE ? CLAUDE_MODELS[0].optionLabel : 'Default'}
+            </option>
+            {models.families.map((family) => <option key={family.name} value={family.name}>{family.optionLabel ?? family.name}</option>)}
             {renderIf(models.custom, <option value={CUSTOM_MODEL}>{models.current}</option>)}
           </select>
         </label>

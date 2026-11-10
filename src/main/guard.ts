@@ -49,6 +49,8 @@ export const planClaudeRun = (options: {
   const { creature, profile, systemPrompt, bridge, resumeSessionId, questId, skipWorktree } = options;
   const fullAuto = creature.autonomy === Autonomy.FULL_AUTO;
   const deny = [...profile.guard.alwaysDeny, ...creature.tools.deny];
+  const sharedDir = join(profile.vault, 'shared');
+  const extraDirs = existsSync(sharedDir) ? [...creature.addDirs, sharedDir] : creature.addDirs;
   const args = [
     '-p',
     '--output-format', 'stream-json',
@@ -56,7 +58,7 @@ export const planClaudeRun = (options: {
     '--permission-mode', PermissionMode[creature.autonomy],
     '--append-system-prompt', systemPrompt,
     '--add-dir', creature.dir,
-    ...creature.addDirs.flatMap((dir) => ['--add-dir', dir]),
+    ...extraDirs.flatMap((dir) => ['--add-dir', dir]),
     '--mcp-config', mcpConfig(bridge),
     '--permission-prompt-tool', `mcp__${MCP_SERVER_NAME}__${PERMISSION_TOOL}`,
   ];

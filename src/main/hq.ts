@@ -26,6 +26,7 @@ import type {
   ProfileSettingsType,
   PrerequisiteType,
   ProfileSummaryType,
+  QuestUsageType,
   SkillInstallRequestType,
   ThreadCreateRequestType,
   ThreadType,
@@ -227,6 +228,7 @@ export class Hq {
     const callbacks = {
       onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => this.quests.addEvent(quest.id, event),
       onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : sessionId),
+      onQuestUsage: (questUsage: QuestUsageType) => this.quests.setUsage(quest.id, questUsage),
       onUsage: (usage: UsageType) => {
         this.usage = usage;
         this.emit();
@@ -264,6 +266,7 @@ export class Hq {
     void handle.done.then((outcome) => {
       this.running.delete(quest.id);
       this.approvals.denyAllForQuest(quest.id);
+      if (outcome.usage) this.quests.setUsage(quest.id, outcome.usage);
       if (outcome.ok) {
         if (outcome.resultText && engine.adapter === EngineAdapter.CLAUDE) this.quests.addEvent(quest.id, { kind: EventKind.RESULT, text: outcome.resultText });
         this.quests.setStatus(quest.id, QuestStatus.DONE);

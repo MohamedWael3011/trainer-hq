@@ -65,6 +65,54 @@ export const duration = (quest: QuestType): string => {
   return seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)} min`;
 };
 
+const EXPENSIVE_COST_USD = 0.25;
+const EXPENSIVE_FRESH_TOKENS = 40_000;
+
+export const formatTokens = (count: number): string => {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 10_000) return `${Math.round(count / 1000)}k`;
+  if (count >= 1_000) return `${(count / 1000).toFixed(1)}k`;
+  return String(count);
+};
+
+export const formatCost = (costUsd: number | undefined): string | undefined => {
+  if (costUsd === undefined || Number.isNaN(costUsd)) return undefined;
+  if (costUsd === 0) return '$0.00';
+  if (costUsd < 0.01) return '<$0.01';
+  return `$${costUsd.toFixed(2)}`;
+};
+
+export const questUsageSummary = (
+  quest: QuestType,
+): { label: string; detail: string; expensive: boolean } | undefined => {
+  const usage = quest.usage;
+  if (!usage) return undefined;
+  const freshTokens = usage.inputTokens + usage.outputTokens + usage.cacheWriteTokens;
+  const totalTokens = freshTokens + usage.cacheReadTokens;
+  const costText = formatCost(usage.costUsd);
+  if (totalTokens === 0 && !costText) return undefined;
+  const parts: string[] = [];
+  if (totalTokens > 0) {
+    parts.push(`${formatTokens(freshTokens > 0 ? freshTokens : totalTokens)} tok`);
+    if (usage.cacheReadTokens > 0) parts.push(`${formatTokens(usage.cacheReadTokens)} cached`);
+  }
+  if (costText) parts.push(costText);
+  const detailParts = [
+    usage.model ? `Model: ${usage.model}` : undefined,
+    `Input: ${usage.inputTokens.toLocaleString()}`,
+    `Output: ${usage.outputTokens.toLocaleString()}`,
+    usage.cacheWriteTokens > 0 ? `Cache write: ${usage.cacheWriteTokens.toLocaleString()}` : undefined,
+    usage.cacheReadTokens > 0 ? `Cache read: ${usage.cacheReadTokens.toLocaleString()}` : undefined,
+    usage.costUsd !== undefined ? `Cost: $${usage.costUsd.toFixed(4)}` : undefined,
+  ].filter(Boolean);
+  const expensive = (usage.costUsd ?? 0) >= EXPENSIVE_COST_USD || freshTokens >= EXPENSIVE_FRESH_TOKENS;
+  return {
+    label: parts.join(' · '),
+    detail: detailParts.join(' · '),
+    expensive,
+  };
+};
+
 export const parseMention = (input: string, state: AppStateType, fallbackId: string): { creatureId: string; text: string } => {
   const match = input.match(/^@([\w-]+)\s+([\s\S]+)$/);
   if (!match) return { creatureId: fallbackId, text: input.trim() };

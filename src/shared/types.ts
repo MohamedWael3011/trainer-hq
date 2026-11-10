@@ -47,6 +47,15 @@ export type QuestEventType = {
   at: number;
 };
 
+export type QuestUsageType = {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  costUsd?: number;
+  model?: string;
+};
+
 export type QuestType = {
   id: string;
   creatureId: string;
@@ -61,6 +70,7 @@ export type QuestType = {
   parentId?: string;
   askedBy?: string;
   threadId?: string;
+  usage?: QuestUsageType;
 };
 
 export type ThreadType = {

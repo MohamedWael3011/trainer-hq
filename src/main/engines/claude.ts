@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
 import { EventKind } from '@shared/constants';
+import type { QuestUsageType } from '@shared/types';
 import { summarizeToolInput } from '../approvals';
 import type { RunCallbacksType, RunHandleType, RunOutcomeType } from './types';
 
@@ -37,6 +38,7 @@ export const runClaude = (options: {
   let resultError = false;
   let cancelled = false;
   let timedOut = false;
+  let questUsage: QuestUsageType | undefined;
   let timer: NodeJS.Timeout | undefined;
 
   if (timeoutMs) {
@@ -87,6 +89,25 @@ export const runClaude = (options: {
       resultText = typeof message.result === 'string' ? message.result : '';
       resultError = message.is_error === true;
       if (message.session_id) callbacks.onSession?.(message.session_id);
+      const rawUsage = (message.usage ?? {}) as Record<string, unknown>;
+      const modelUsage = (message.modelUsage ?? {}) as Record<string, Record<string, unknown>>;
+      const modelKey = Object.keys(modelUsage)[0];
+      const modelEntry = modelKey ? modelUsage[modelKey] : undefined;
+      const inputTokens = Number(rawUsage.input_tokens ?? modelEntry?.inputTokens ?? 0);
+      const outputTokens = Number(rawUsage.output_tokens ?? modelEntry?.outputTokens ?? 0);
+      const cacheReadTokens = Number(rawUsage.cache_read_input_tokens ?? modelEntry?.cacheReadInputTokens ?? 0);
+      const cacheWriteTokens = Number(rawUsage.cache_creation_input_tokens ?? modelEntry?.cacheCreationInputTokens ?? 0);
+      const costUsd = typeof message.total_cost_usd === 'number'
+        ? message.total_cost_usd
+        : typeof message.cost_usd === 'number'
+          ? message.cost_usd
+          : typeof modelEntry?.costUSD === 'number'
+            ? modelEntry.costUSD
+            : undefined;
+      if (inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens > 0 || costUsd !== undefined) {
+        questUsage = { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, costUsd, model: modelKey };
+        callbacks.onQuestUsage?.(questUsage);
+      }
     }
   });
 
@@ -101,6 +122,7 @@ export const runClaude = (options: {
         usageLimited: USAGE_LIMIT_PATTERN.test(`${resultText}\n${stderr}`) && (resultError || code !== 0),
         cancelled,
         timedOut,
+        usage: questUsage,
       });
     };
     child.on('error', (error) => finish(null, error));

@@ -13,11 +13,11 @@ export const PermissionMode = {
 
 // Claude models offered in the Dex. An empty id means the CLI's default model.
 export const CLAUDE_MODELS = [
-  { id: '', label: 'Default', desc: 'Whatever Claude Code uses' },
-  { id: 'claude-fable-5-1', label: 'Fable 5.1', desc: 'Most capable' },
-  { id: 'opus', label: 'Opus', desc: 'Deep reasoning' },
-  { id: 'sonnet', label: 'Sonnet', desc: 'Balanced speed and smarts' },
-  { id: 'haiku', label: 'Haiku', desc: 'Fastest and cheapest' },
+  { id: '', label: 'Default', desc: 'Follows your CLI setting (Opus)', cost: 'CLI default (Opus)', optionLabel: 'Default · follows CLI (Opus)' },
+  { id: 'claude-fable-5-1', label: 'Fable 5.1', desc: 'Most capable · uses your plan fastest', cost: 'Highest plan use', optionLabel: 'Fable 5.1 · most capable, uses your plan fastest' },
+  { id: 'opus', label: 'Opus', desc: 'Deep reasoning · heavy plan use', cost: 'High plan use', optionLabel: 'Opus · deep reasoning, heavy plan use' },
+  { id: 'sonnet', label: 'Sonnet', desc: 'Balanced speed and smarts', cost: 'Medium plan use', optionLabel: 'Sonnet · balanced' },
+  { id: 'haiku', label: 'Haiku', desc: 'Fastest · cheapest on your plan', cost: 'Cheapest', optionLabel: 'Haiku · cheapest' },
 ] as const;
 
 // How Day Care finds notes worth keeping after a chat.

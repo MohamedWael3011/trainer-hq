@@ -46,7 +46,9 @@ ${repoLines}
 Steps:
 1. Pick a short, original, friendly creature name and a kebab-case id. The folder party/<id>/ must not already exist (check with ls).
 2. Research the repos above, read-only, only as much as needed to give the creature real, specific knowledge for its job: where the relevant code lives, conventions, gotchas, commands. Cite file paths.
-3. Write party/<id>/brain/*.md: 2 to 4 dense notes with YAML frontmatter (title, tags, updated). Facts from code, not guesses; mark guesses as (inferred).
+3. Write party/<id>/brain/*.md using token-lean tiered notes with YAML frontmatter (title, tags, summary, tier, updated):
+   - One compact core workspace/rules note (01-workspace.md, tier: hot, under 1500 chars) for always-on identity, repo map and critical constraints.
+   - 1 to 3 modular topic notes (tier: warm, structured with clear ## headings) for deep domain rules, conventions and gotchas so the creature can pull only the section it needs on demand with Read/Grep without bloating every prompt. Facts from code, not guesses; mark guesses as (inferred).
 4. If the job needs a reusable procedure, write party/<id>/skills/<skill-name>/SKILL.md with frontmatter (name, description) and clear steps.
 5. Write party/<id>/creature.yaml with exactly these keys:
    id, no (${nextNo}), name, role (under 6 words), blurb (1-2 sentences, user-facing), types (1-2 short uppercase tags),

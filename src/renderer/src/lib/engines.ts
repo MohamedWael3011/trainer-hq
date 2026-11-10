@@ -4,7 +4,7 @@ import type { AppStateType, CreatureType } from '@shared/types';
 import { AUTONOMY_INFO } from './format';
 
 export type ModelChoiceType = { id: string; label: string; desc?: string };
-export type ModelFamilyType = { name: string; variants: { id: string; effort: string }[] };
+export type ModelFamilyType = { name: string; optionLabel?: string; variants: { id: string; effort: string }[] };
 
 // "Gemini 4 Argon (High)" -> family "Gemini 4 Argon", effort "High".
 const EFFORT_LABEL = /^(.*?)\s*\(([^)]+)\)\s*$/;
@@ -31,7 +31,11 @@ const toFamilies = (models: ModelChoiceType[]): ModelFamilyType[] => {
 export const defaultVariant = (family: ModelFamilyType): string =>
   (family.variants.find((variant) => variant.effort.toLowerCase() === 'medium') ?? family.variants[0]).id;
 
-const CLAUDE_FAMILIES: ModelFamilyType[] = CLAUDE_MODELS.filter((model) => model.id).map((model) => ({ name: model.label, variants: [{ id: model.id, effort: '' }] }));
+const CLAUDE_FAMILIES: ModelFamilyType[] = CLAUDE_MODELS.filter((model) => model.id).map((model) => ({
+  name: model.label,
+  optionLabel: model.optionLabel,
+  variants: [{ id: model.id, effort: '' }],
+}));
 
 // Everything a model picker needs for one creature, whatever its engine.
 export const useModelChoices = (state: AppStateType, creature: CreatureType | undefined) => {

@@ -5,7 +5,7 @@ import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
 import { renderIf } from '../../lib/renderIf';
-import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, timeAgo } from '../../lib/format';
+import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, questUsageSummary, timeAgo } from '../../lib/format';
 import './styles.css';
 
 type PropsType = {
@@ -48,12 +48,20 @@ const Quests = ({ state, onOpen }: PropsType) => {
       <div className="quests-list">
         {quests.map((quest) => {
           const lastError = [...quest.events].reverse().find((event) => event.kind === EventKind.ERROR);
+          const usage = questUsageSummary(quest);
           return (
             <div key={quest.id} className="quest-row">
               <Sprite state={state} id={quest.creatureId} className="quest-sprite" />
               <button className="quest-main" onClick={() => onOpen(quest.creatureId)}>
                 <span className="quest-title">{quest.title || 'Untitled quest'}</span>
-                <span className="quest-meta">{creatureName(state, quest.creatureId)} · {quest.askedBy ? `asked by ${creatureName(state, quest.askedBy)}` : quest.kind} · {timeAgo(quest.startedAt)} · {duration(quest)}</span>
+                <span className="quest-meta">
+                  {creatureName(state, quest.creatureId)} · {quest.askedBy ? `asked by ${creatureName(state, quest.askedBy)}` : quest.kind} · {timeAgo(quest.startedAt)} · {duration(quest)}
+                  {renderIf(!!usage, (
+                    <span className={`quest-usage${usage?.expensive ? ' quest-usage-warn' : ''}`} title={usage?.detail}>
+                      {' · '}{usage?.label}
+                    </span>
+                  ))}
+                </span>
                 {renderIf(!!lastError, <span className="quest-error">{lastError?.text}</span>)}
               </button>
               <div className="quest-side">

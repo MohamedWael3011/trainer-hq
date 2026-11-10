@@ -5,7 +5,8 @@
 .quest-sprite { width: 42px; height: 42px; object-fit: contain; }
 .quest-main { display: grid; gap: 2px; text-align: left; min-width: 0; }
 .quest-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.quest-meta { font-size: 11px; color: var(--fg-3); }
+.quest-meta { font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.quest-usage-warn { color: var(--amber, var(--red)); font-weight: 700; }
 .quest-error { font-size: 11px; color: var(--red); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quest-side { display: flex; gap: 6px; align-items: center; }
 .quests-empty { padding: 20px 2px; }

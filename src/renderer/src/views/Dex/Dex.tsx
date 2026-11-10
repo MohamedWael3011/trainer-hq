@@ -127,6 +127,7 @@ const Dex = ({ state, creatureId }: PropsType) => {
               >
                 <b>{option.label}</b>
                 <span>{option.desc}</span>
+                <code>{option.cost}</code>
               </button>
             ))}
           </div>
