@@ -1,4 +1,4 @@
-import { Autonomy, CLAUDE_MODELS, EngineAdapter, type AutonomyType } from '@shared/constants';
+import { Autonomy, CLAUDE_EFFORTS, CLAUDE_MODELS, EngineAdapter, type AutonomyType } from '@shared/constants';
 import type { AppStateType, CreatureType } from '@shared/types';
 import { renderIf } from '../../lib/renderIf';
 import { autonomyText, defaultVariant, useModelChoices } from '../../lib/engines';
@@ -56,6 +56,14 @@ const CreatureControls = ({ state, creature }: PropsType) => {
           <span>Effort</span>
           <select value={models.current} onChange={(event) => void window.hq.setModel(creature.id, event.target.value)}>
             {models.family?.variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.effort || variant.id}</option>)}
+          </select>
+        </label>
+      ))}
+      {renderIf(models.adapter === EngineAdapter.CLAUDE, (
+        <label className="cc-field" title="How long Claude thinks. Lower effort uses less of your plan. Default follows your Claude Code setting.">
+          <span>Effort</span>
+          <select value={creature.effort ?? ''} onChange={(event) => void window.hq.setEffort(creature.id, event.target.value)}>
+            {CLAUDE_EFFORTS.map((level) => <option key={level.id} value={level.id}>{level.label}</option>)}
           </select>
         </label>
       ))}

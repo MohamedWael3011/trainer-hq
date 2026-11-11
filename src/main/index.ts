@@ -27,12 +27,14 @@ let stopFullscreenWatch: (() => void) | undefined;
 
 const registerIpc = (): void => {
   ipcMain.handle(Ipc.STATE_GET, () => hq.getState());
+  ipcMain.handle(Ipc.LIVE_GET, () => hq.getLive());
   ipcMain.handle(Ipc.CHAT_SEND, (_event, request: ChatRequestType) => hq.chat(request));
   ipcMain.handle(Ipc.HATCH_START, (_event, request: HatchRequestType) => hq.hatch(request));
   ipcMain.handle(Ipc.QUEST_CANCEL, (_event, questId: string) => hq.cancel(questId));
   ipcMain.handle(Ipc.APPROVAL_DECIDE, (_event, decision: ApprovalDecisionType) => hq.decideApproval(decision));
   ipcMain.handle(Ipc.CREATURE_AUTONOMY, (_event, id: string, autonomy: AutonomyType) => hq.setAutonomy(id, autonomy));
   ipcMain.handle(Ipc.CREATURE_MODEL, (_event, id: string, model: string) => hq.setModel(id, model));
+  ipcMain.handle(Ipc.CREATURE_EFFORT, (_event, id: string, effort: string) => hq.setEffort(id, effort));
   ipcMain.handle(Ipc.CREATURE_ENGINE, (_event, id: string, engine: string) => hq.setEngine(id, engine));
   ipcMain.handle(Ipc.ENGINE_MODELS, (_event, engine: string) => hq.engineModels(engine));
   ipcMain.handle(Ipc.CREATURE_SPRITE, (_event, id: string, path: string) => hq.setSprite(id, path));
@@ -62,6 +64,10 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.THREAD_CREATE, (_event, request: ThreadCreateRequestType) => hq.createThread(request));
   ipcMain.handle(Ipc.THREAD_ARCHIVE, (_event, id: string, removeWorktree: boolean) => hq.archiveThread(id, removeWorktree));
   ipcMain.handle(Ipc.THREAD_CLEAR, (_event, creatureId: string, threadId?: string) => hq.clearThread(creatureId, threadId));
+  ipcMain.handle(Ipc.THREAD_COMPACT, (_event, creatureId: string, threadId?: string) => hq.compactThread(creatureId, threadId));
+  ipcMain.handle(Ipc.UPDATE_CHECK, () => hq.checkUpdate());
+  ipcMain.handle(Ipc.UPDATE_INSTALL, () => hq.installUpdate());
+  ipcMain.handle(Ipc.THREAD_TERMINAL, (_event, creatureId: string, threadId?: string) => hq.openThreadInTerminal(creatureId, threadId));
   ipcMain.handle(Ipc.AUTH_LOGIN, () => hq.openLogin());
   ipcMain.handle(Ipc.PROFILE_CREATE, (_event, request: ProfileCreateRequestType) => hq.createProfile(request));
   ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string) => windows.openDashboard(creatureId));
@@ -104,6 +110,9 @@ app.whenReady().then(async () => {
   windows.create(hq.isDockHidden(), hq.dockSize());
   if (!app.getLoginItemSettings().wasOpenedAtLogin) windows.openDashboard();
   runSmokeIfRequested({ windows: () => windows.labeled(), state: () => hq.getState(), chat: (request) => hq.chat(request), openNotch: () => windows.toggleNotchFromShortcut(), openView: (view) => windows.dashboard?.webContents.send(Ipc.OPEN_VIEW, view), cancel: (questId) => hq.cancel(questId), openNotchAnimated: () => windows.openNotchAnimated() });
+  // Dev runs (npm run dev) have no build info and skip the check.
+  hq.startUpdateChecks();
+  hq.onLive((live) => windows.all().forEach((win) => win.webContents.send(Ipc.LIVE_CHANGED, live)));
   hq.onState((state) => {
     windows.setDockVisible(!state.ui.dockHidden);
     windows.all().forEach((win) => win.webContents.send(Ipc.STATE_CHANGED, state));

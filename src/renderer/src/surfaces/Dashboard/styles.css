@@ -33,6 +33,8 @@
 .dash-main { min-width: 0; min-height: 0; overflow-y: auto; }
 .dash-errors { margin: 16px 22px 0; padding: 10px 12px; border-radius: 10px; font-size: 12px; white-space: pre-wrap; color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
 .dash-auth { margin: 16px 22px 0; padding: 12px 14px; border-radius: 12px; display: flex; gap: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap; border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent); background: color-mix(in srgb, var(--amber) 9%, var(--surface)); font-size: 12px; }
+.dash-update { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.dash-update a { color: var(--accent); font-weight: 700; }
 .dash-auth p { color: var(--fg-2); margin-top: 2px; }
 .dash-auth-actions { display: flex; gap: 6px; }
 .dash-mon[draggable='true'] { cursor: grab; }

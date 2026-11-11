@@ -35,7 +35,7 @@ Hover the notch, or press <kbd>⌥ Space</kbd>, pick a creature (<kbd>⇥</kbd> 
 
 ### The party
 
-Every creature has a chat with Markdown, code blocks and tables, inline engine/model/autonomy controls, per-reply token and cost usage, plus **threads** for separate contexts (a branch or a PR in its own git worktree).
+Every creature has a chat with Markdown, code blocks and tables, replies that type out live under a terminal-style status line (spinner, elapsed time, `↓ tokens`, running helper agents, token-saving tips), inline engine/model/effort/autonomy controls, per-reply token and cost usage, plus **threads** for separate contexts (a branch or a PR in its own git worktree).
 
 <img src="docs/media/party-chat.png" width="760" alt="A chat with Scout showing a formatted answer with a table and a code block">
 
@@ -79,10 +79,13 @@ npm run install:app      # builds, signs ad hoc, copies to /Applications and ope
 
 Then launch **Trainer HQ** from Spotlight. Onboarding takes about two minutes; turn on **Launch at login** at the end so the dock and notch are always there.
 
+**Staying up to date.** The app remembers the commit it was built from and checks GitHub every few hours (one anonymous, read-only API call, no account info sent). When `main` has moved on, the dashboard shows a banner with what changed. **Update** opens Terminal in your checkout and runs `git pull --ff-only && npm install && npm run install:app`. Builds made from unpushed local commits, or with no network, simply never show the banner.
+
 <details>
 <summary>Other ways to run it</summary>
 
 - `npm run dev`: hot-reloading development build.
+- `npm test`: unit tests (Vitest). Claude runs are tested against a scripted fake CLI, so tests never call the API.
 - `npm run package:mac`: builds `dist/mac-arm64/Trainer HQ.app` without installing.
 - `npm run dist:mac`: builds a `.dmg`. Downloaded copies are quarantined by macOS; clear that with `xattr -dr com.apple.quarantine "/Applications/Trainer HQ.app"`.
 - `npm run smoke`: builds, launches, saves a PNG of every window to `out/smoke/`, and quits.
@@ -210,6 +213,25 @@ Each creature has a **Main** thread and as many extra threads as you like (**+ T
 </details>
 
 <details>
+<summary><b>Keeping token use low</b></summary>
+
+Every step Claude takes (each file read, search or edit) resends the whole conversation so far, so the cost of a chat grows with its length, not with how short your message is. Trainer HQ leans on Claude Code's own mechanisms to keep that in check:
+
+- **Auto-compact at 160k** (`--autocompact`). A long chat is summarized by Claude Code before it gets expensive, instead of growing toward the 1M window.
+- **Fresh start after a break.** Claude Code's prompt cache lasts about an hour. Resuming a big chat after that re-bills the whole conversation at a higher rate. So when a chat has been idle over an hour and is above 40k tokens, the next message starts a new session with a short recap of the last few exchanges. The chat shows a note when this happens.
+- **Frozen prompt per session.** Claude Code records the system prompt once per conversation, so brain edits never invalidate the cache mid-chat. They apply from the next fresh session or compaction.
+- **Shared cache across creatures** (`--exclude-dynamic-system-prompt-sections`). Per-folder details move out of the system prompt so fresh sessions reuse more of the cached prefix.
+- **Effort per creature** (Effort picker in the chat, or `effort:` in `creature.yaml`). Medium is right for most work. Default follows your Claude Code setting.
+- **Lean-reading rules.** Creatures are told to grep before reading, read big files in parts, skip re-reads and edit with Edit rather than patch scripts.
+
+- **Works with whatever Claude Code version people have.** Trainer HQ reads `claude --help` once and only passes options the installed CLI knows, so an older install keeps working with fewer savings instead of failing. Updating Claude Code turns the rest on (**Check again** in onboarding re-reads it).
+- **Overloaded? Retry instead of failing** (`--fallback-model`). Opus and Fable creatures retry on Sonnet when their model is overloaded. Sonnet and Haiku creatures never fall back to something pricier.
+- **Messages while it works go into the same run.** Like typing in the terminal mid-task, a message sent while a Claude creature is working is picked up at its next step (`--input-format stream-json`). There's no second run resending the whole chat. Messages with files, and messages to other engines, wait and go out together when the reply finishes.
+
+Every reply shows its tokens and the conversation size (`ctx 120k`), which turns amber above 150k. Compactions show as a note (`Auto-compacted the conversation: 160k → 22k tokens`). When a topic is done, **Clear** the chat: that's the single biggest saving, the same as opening a new terminal chat. To keep going on the same topic with a lighter chat, press **Compact** (or type `/compact`), which runs Claude Code's own compaction. **Terminal** opens the same chat in Claude Code in Terminal (`claude --resume`, named like `Scout · Main`), for when you want the full CLI.
+</details>
+
+<details>
 <summary><b>Handoffs between creatures</b></summary>
 
 Every creature gets an `ask_creature` tool and a roster of teammates. When a question is outside its role, it asks the right teammate: Trainer HQ runs a linked quest with that creature's own notes, tools and autonomy, and returns the answer. The asking chat shows a live handoff card; the dock shows "Asking …" and "On it for …". Chains stop at two levels and time out after 10 minutes.
@@ -258,8 +280,15 @@ guard:
     maxMinutes: 45
     maxPlanUsage: 0.85
     worktree: true
+    maxBudgetUsd: 10                  # optional: stop an unattended run past this estimated API cost
   alwaysDeny:
     - "Bash(gh pr merge:*)"
+
+session:                              # see "Keeping token use low"
+  autocompact: 160000                 # 100000-1000000, or auto (Claude Code's default)
+  idleResetMinutes: 60                # 0 = always resume, however long the chat sat idle
+  idleResetMinTokens: 40000
+  fallbackModel: sonnet               # retry on this when Opus/Fable is overloaded ('' = off)
 
 daycare:
   mode: free                          # free: creatures list notes themselves · ai: extra Haiku pass · off
@@ -293,6 +322,7 @@ types: [EXPLORE, READ-ONLY]
 sprite: builtin:pigabyte            # or a path relative to the creature folder
 engine: claude                      # any key under engines:
 model: claude-sonnet-5-5            # optional
+effort: medium                      # optional: low | medium | high | xhigh | max (Claude only)
 autonomy: ask                       # ask | auto-edit | full-auto
 cwd: ~/code/my-app
 addDirs: [~/code/other-repo]
@@ -345,7 +375,7 @@ src/
 └─ renderer/    React UI: Dock, Notch and Dashboard surfaces
 ```
 
-Electron + React + TypeScript, built with electron-vite. `npm run typecheck` checks both sides.
+Electron + React + TypeScript, built with electron-vite. `npm run typecheck` checks both sides; `npm test` runs the unit tests.
 
 ## Credits
 

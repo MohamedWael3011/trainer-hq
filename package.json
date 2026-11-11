@@ -10,6 +10,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
     "package:mac": "electron-vite build && electron-builder --mac --dir && codesign --force --deep --sign - \"dist/mac-arm64/Trainer HQ.app\"",
     "dist:mac": "electron-vite build && electron-builder --mac dmg",
     "smoke": "electron-vite build && THQ_SMOKE_DIR=./out/smoke electron .",
@@ -34,7 +35,8 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "typescript": "5.6.3",
-    "vite": "5.4.11"
+    "vite": "5.4.11",
+    "vitest": "2.1.9"
   },
   "build": {
     "appId": "app.trainerhq.desktop",

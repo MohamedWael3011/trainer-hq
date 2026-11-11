@@ -157,6 +157,7 @@ export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfig
     creature.blurb,
     extra,
     `Your notes live in ${creature.dir}.`,
+    'Keep the conversation lean: everything you read stays in context and is resent on every step. Find things with Grep/Glob first, Read big files with offset/limit instead of whole, never re-read a file you already have, change code with Edit rather than writing throwaway patch scripts, and keep command output short (head, --stat, -n).',
     profile.daycareMode === DaycareMode.FREE
       ? `If this chat taught you something durable and non-obvious about the user's work (a gotcha, contract, decision, file location or convention), end your answer with a line "${REMEMBER_HEADING}" followed by 1-3 short "- " bullets. Leave it out when there's nothing new.`
       : '',

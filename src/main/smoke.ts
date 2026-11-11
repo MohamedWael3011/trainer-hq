@@ -46,7 +46,9 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
       const [creatureId, ...rest] = process.env.THQ_SMOKE_CHAT_NOWAIT.split(':');
       pendingQuest = host.chat({ creatureId, text: rest.join(':') });
       const started = Date.now();
-      while (Date.now() - started < CHAT_TIMEOUT_MS && host.state().approvals.length === 0) {
+      // THQ_SMOKE_NOWAIT_MS captures a reply mid-stream instead of waiting for an approval.
+      const waitMs = Number(process.env.THQ_SMOKE_NOWAIT_MS) > 0 ? Number(process.env.THQ_SMOKE_NOWAIT_MS) : CHAT_TIMEOUT_MS;
+      while (Date.now() - started < waitMs && host.state().approvals.length === 0) {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
       }
     }

@@ -24,9 +24,19 @@ export const checkAuth = (bin: string, env: NodeJS.ProcessEnv): Promise<AuthStat
     });
   });
 
-export const openLoginTerminal = (bin: string, claudeConfigDir?: string): void => {
-  const prefix = claudeConfigDir ? `CLAUDE_CONFIG_DIR=${quote(claudeConfigDir)} ` : '';
-  const command = `${prefix}${quote(bin)} auth login`;
+export const runInTerminal = (command: string): void => {
   const script = `tell application "Terminal"\nactivate\ndo script ${JSON.stringify(command)}\nend tell`;
   execFile('osascript', ['-e', script]);
+};
+
+const configPrefix = (claudeConfigDir?: string): string => (claudeConfigDir ? `CLAUDE_CONFIG_DIR=${quote(claudeConfigDir)} ` : '');
+
+export const openLoginTerminal = (bin: string, claudeConfigDir?: string): void => {
+  runInTerminal(`${configPrefix(claudeConfigDir)}${quote(bin)} auth login`);
+};
+
+// Continue an app chat in the real Claude Code terminal UI, from the folder it ran in.
+export const openSessionTerminal = (options: { bin: string; cwd: string; sessionId: string; addDirs: string[]; claudeConfigDir?: string }): void => {
+  const dirs = options.addDirs.map((dir) => ` --add-dir ${quote(dir)}`).join('');
+  runInTerminal(`cd ${quote(options.cwd)} && ${configPrefix(options.claudeConfigDir)}${quote(options.bin)} --resume ${quote(options.sessionId)}${dirs}`);
 };

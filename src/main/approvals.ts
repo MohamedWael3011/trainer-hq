@@ -41,7 +41,11 @@ export const summarizeToolInput = (toolName: string, input: unknown): string => 
   if (toolName.endsWith('ask_creature') && typeof data.creature === 'string') {
     return `ask ${data.creature}: ${String(data.question ?? '')}`.slice(0, SUMMARY_LIMIT);
   }
-  const pick = data.command ?? data.file_path ?? data.path ?? data.pattern ?? data.url ?? data.query;
+  if ((toolName === 'Agent' || toolName === 'Task') && typeof data.description === 'string') {
+    return `Helper agent: ${data.description}`.slice(0, SUMMARY_LIMIT);
+  }
+  if (toolName === 'TodoWrite' && Array.isArray(data.todos)) return `Updated the plan (${data.todos.length} steps)`;
+  const pick = data.command ?? data.file_path ?? data.path ?? data.pattern ?? data.url ?? data.query ?? data.skill;
   const text = typeof pick === 'string' ? pick : JSON.stringify(data);
   return `${toolName} ${text}`.slice(0, SUMMARY_LIMIT);
 };

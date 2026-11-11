@@ -1,6 +1,8 @@
 import type { AutonomyType, SurfaceType } from './constants';
 import type {
   AppStateType,
+  QuestLiveType,
+  UpdateInfoType,
   AttachmentInfoType,
   ProfileCreateRequestType,
   SkillInstallRequestType,
@@ -20,6 +22,8 @@ import type {
 export type HqApiType = {
   getState: () => Promise<AppStateType>;
   onState: (callback: (state: AppStateType) => void) => () => void;
+  getLive: () => Promise<Record<string, QuestLiveType>>;
+  onLive: (callback: (live: Record<string, QuestLiveType>) => void) => () => void;
   onNotchToggle: (callback: (payload: { instant: boolean }) => void) => () => void;
   onFocusCreature: (callback: (creatureId: string) => void) => () => void;
   onDockToggle: (callback: () => void) => () => void;
@@ -36,6 +40,7 @@ export type HqApiType = {
   decideApproval: (decision: ApprovalDecisionType) => Promise<void>;
   setAutonomy: (id: string, autonomy: AutonomyType) => Promise<void>;
   setModel: (id: string, model: string) => Promise<void>;
+  setEffort: (id: string, effort: string) => Promise<void>;
   setEngine: (id: string, engine: string) => Promise<void>;
   engineModels: (engine: string) => Promise<{ id: string; label: string }[] | null>;
   setSprite: (id: string, file: File) => Promise<void>;
@@ -48,6 +53,10 @@ export type HqApiType = {
   createThread: (request: ThreadCreateRequestType) => Promise<string>;
   archiveThread: (id: string, removeWorktree: boolean) => Promise<void>;
   clearThread: (creatureId: string, threadId?: string) => Promise<void>;
+  compactThread: (creatureId: string, threadId?: string) => Promise<string>;
+  openThreadInTerminal: (creatureId: string, threadId?: string) => Promise<void>;
+  checkUpdate: () => Promise<UpdateInfoType | undefined>;
+  installUpdate: () => Promise<void>;
   onOpenView: (callback: (view: string) => void) => () => void;
   labState: () => Promise<LabStateType>;
   getSettings: () => Promise<ProfileSettingsType>;

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { NOTCH_TARGET_KEY, Surface } from '@shared/constants';
-import type { AppStateType } from '@shared/types';
+import type { AppStateType, QuestType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
+import { LiveBadge } from '../../components/LiveStatus/LiveStatus';
+import { useQuestLive } from '../../hooks/useQuestLive';
 import Badge from '../../components/Badge/Badge';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
 import { renderIf } from '../../lib/renderIf';
@@ -12,8 +14,13 @@ type PropsType = {
   state: AppStateType;
 };
 
+const NotchLive = ({ quest }: { quest: QuestType }) => <LiveBadge quest={quest} live={useQuestLive(quest.id)} />;
+
 const RECENT_COUNT = 3;
 const KEY_ENTER = 'Enter';
+// The notch opens on hover and its rows slide in under the pointer. A click in that window was
+// aimed at something else (the input, a creature), so rows ignore it instead of opening the dashboard.
+const OPEN_SETTLE_MS = 450;
 const KEY_ESCAPE = 'Escape';
 const KEY_STOP = '.';
 const KEY_TAB = 'Tab';
@@ -81,7 +88,9 @@ const Notch = ({ state }: PropsType) => {
     return () => observer.disconnect();
   }, []);
 
+  const openedAtRef = useRef(0);
   const show = useCallback((isInstant: boolean) => {
+    if (!openRef.current) openedAtRef.current = Date.now();
     openRef.current = true;
     setInstant(isInstant);
     setOpen(true);
@@ -180,10 +189,18 @@ const Notch = ({ state }: PropsType) => {
           {renderIf(!approval, (
             <div className="notch-rows">
               {recent.map((quest) => (
-                <button key={quest.id} className="notch-row" onClick={() => void window.hq.openDashboard(quest.creatureId)}>
+                <button
+                  key={quest.id}
+                  className="notch-row"
+                  title={`Open ${creatureName(state, quest.creatureId)}'s chat`}
+                  onClick={() => {
+                    if (Date.now() - openedAtRef.current < OPEN_SETTLE_MS) return;
+                    void window.hq.openDashboard(quest.creatureId);
+                  }}
+                >
                   <Sprite state={state} id={quest.creatureId} className="notch-row-sprite" />
                   <span className="notch-row-text"><b>{creatureName(state, quest.creatureId)}</b> · {quest.title}</span>
-                  <Badge tone={STATUS_TONE[quest.status]}>{STATUS_LABEL[quest.status]}</Badge>
+                  {isLive(quest) ? <NotchLive quest={quest} /> : <Badge tone={STATUS_TONE[quest.status]}>{STATUS_LABEL[quest.status]}</Badge>}
                 </button>
               ))}
               {renderIf(recent.length === 0, <p className="notch-empty">No quests yet. Type @name and a task.</p>)}

@@ -6,6 +6,7 @@ import { Autonomy, BUILTIN_SPRITE_PREFIX, DEFAULT_SPRITE, type AutonomyType } fr
 import type { CreatureType } from '@shared/types';
 import { expandHome } from './paths';
 
+const EFFORTS = new Set(['low', 'medium', 'high', 'xhigh', 'max']);
 const PARTY_DIR = 'party';
 const CREATURE_FILE = 'creature.yaml';
 const DEFAULT_BRAIN = ['brain/*.md'];
@@ -47,6 +48,7 @@ const parseCreature = (dir: string, index: number): CreatureType | null => {
     sprite: typeof data.sprite === 'string' ? data.sprite : `${BUILTIN_SPRITE_PREFIX}${DEFAULT_SPRITE}`,
     engine: typeof data.engine === 'string' ? data.engine : 'claude',
     model: typeof data.model === 'string' ? data.model : undefined,
+    effort: typeof data.effort === 'string' && EFFORTS.has(data.effort) ? data.effort : undefined,
     cwd: typeof data.cwd === 'string' ? expandHome(data.cwd, dir) : undefined,
     addDirs: strings(data.addDirs).map((path) => expandHome(path, dir)),
     brain: data.brain ? strings(data.brain) : DEFAULT_BRAIN,

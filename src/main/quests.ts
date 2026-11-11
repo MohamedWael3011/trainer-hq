@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { QuestKind, QuestStatus, type QuestKindType, type QuestStatusType } from '@shared/constants';
+import { EventKind, QuestKind, QuestStatus, type QuestKindType, type QuestStatusType } from '@shared/constants';
 import type { QuestEventType, QuestType, QuestUsageType, StatsType } from '@shared/types';
 import { profileHome } from './paths';
 
@@ -13,6 +13,9 @@ const KEEP_EVENTS = 400;
 const TITLE_LIMIT = 90;
 const DAYS = 14;
 const MS_PER_DAY = 86_400_000;
+const RECAP_EXCHANGES = 3;
+const RECAP_ASK_CHARS = 500;
+const RECAP_ANSWER_CHARS = 1_500;
 const LIVE = new Set<QuestStatusType>([QuestStatus.RUNNING, QuestStatus.WAITING]);
 
 const readJson = <T>(file: string, fallback: T): T => {
@@ -107,6 +110,32 @@ export class QuestStore {
     quest.usage = usage;
     this.persist();
     this.onChange();
+  }
+
+  // When the session was last used and how big it was, so a cold resume of a huge session can be avoided.
+  sessionActivity(sessionId: string): { at: number; contextTokens?: number } | undefined {
+    const last = this.quests.find((quest) => quest.sessionId === sessionId);
+    if (!last) return undefined;
+    const withContext = this.quests.find((quest) => quest.sessionId === sessionId && quest.usage?.contextTokens);
+    return { at: last.endedAt ?? last.startedAt, contextTokens: withContext?.usage?.contextTokens };
+  }
+
+  // A short text recap of the last few exchanges in a session, to carry over into a fresh one.
+  recap(sessionId: string, count = RECAP_EXCHANGES): string {
+    const clip = (text: string, limit: number): string => {
+      const flat = text.replace(/\s+/g, ' ').trim();
+      return flat.length > limit ? `${flat.slice(0, limit)}…` : flat;
+    };
+    return this.quests
+      .filter((quest) => quest.sessionId === sessionId && quest.kind === QuestKind.CHAT)
+      .slice(0, count)
+      .reverse()
+      .map((quest) => {
+        const asked = quest.events.find((event) => event.kind === EventKind.USER)?.text ?? quest.title;
+        const answer = [...quest.events].reverse().find((event) => event.kind === EventKind.RESULT || event.kind === EventKind.TEXT)?.text ?? '(no answer recorded)';
+        return `User: ${clip(asked, RECAP_ASK_CHARS)}\nYou: ${clip(answer, RECAP_ANSWER_CHARS)}`;
+      })
+      .join('\n\n');
   }
 
   sessionFor(key: string): string | undefined {

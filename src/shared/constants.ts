@@ -20,6 +20,16 @@ export const CLAUDE_MODELS = [
   { id: 'haiku', label: 'Haiku', desc: 'Fastest · cheapest on your plan', cost: 'Cheapest', optionLabel: 'Haiku · cheapest' },
 ] as const;
 
+// Claude Code effort levels. '' follows the user's own CLI setting; lower effort thinks less and uses less of the plan.
+export const CLAUDE_EFFORTS = [
+  { id: '', label: 'Default' },
+  { id: 'low', label: 'Low · quick edits' },
+  { id: 'medium', label: 'Medium · recommended' },
+  { id: 'high', label: 'High · harder problems' },
+  { id: 'xhigh', label: 'Extra high · heavy plan use' },
+  { id: 'max', label: 'Max · heaviest plan use' },
+] as const;
+
 // How Day Care finds notes worth keeping after a chat.
 // free: the creature lists them itself at the end of its answer (no extra model call).
 // ai: a separate cheap Haiku pass reads the chat. off: no suggestions.
@@ -131,11 +141,14 @@ export const LAB_PROTOCOL = 'thq-lab';
 export const Ipc = {
   STATE_GET: 'state:get',
   STATE_CHANGED: 'state:changed',
+  LIVE_CHANGED: 'live:changed',
+  LIVE_GET: 'live:get',
   CHAT_SEND: 'chat:send',
   QUEST_CANCEL: 'quest:cancel',
   APPROVAL_DECIDE: 'approval:decide',
   CREATURE_AUTONOMY: 'creature:autonomy',
   CREATURE_MODEL: 'creature:model',
+  CREATURE_EFFORT: 'creature:effort',
   CREATURE_ENGINE: 'creature:engine',
   ENGINE_MODELS: 'engine:models',
   CREATURE_SPRITE: 'creature:sprite',
@@ -148,6 +161,10 @@ export const Ipc = {
   THREAD_CREATE: 'thread:create',
   THREAD_ARCHIVE: 'thread:archive',
   THREAD_CLEAR: 'thread:clear',
+  THREAD_COMPACT: 'thread:compact',
+  THREAD_TERMINAL: 'thread:terminal',
+  UPDATE_CHECK: 'update:check',
+  UPDATE_INSTALL: 'update:install',
   LAB_STATE: 'lab:state',
   SETTINGS_GET: 'settings:get',
   SETTINGS_SAVE: 'settings:save',

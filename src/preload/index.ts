@@ -3,6 +3,8 @@ import { Ipc, type AutonomyType, type SurfaceType } from '@shared/constants';
 import type { HqApiType } from '@shared/api';
 import type {
   AppStateType,
+  QuestLiveType,
+  UpdateInfoType,
   AttachmentInfoType,
   ProfileCreateRequestType,
   SkillInstallRequestType,
@@ -28,6 +30,8 @@ const subscribe = <T>(channel: string, callback: (payload: T) => void): (() => v
 const api: HqApiType = {
   getState: (): Promise<AppStateType> => ipcRenderer.invoke(Ipc.STATE_GET),
   onState: (callback: (state: AppStateType) => void) => subscribe(Ipc.STATE_CHANGED, callback),
+  getLive: (): Promise<Record<string, QuestLiveType>> => ipcRenderer.invoke(Ipc.LIVE_GET),
+  onLive: (callback: (live: Record<string, QuestLiveType>) => void) => subscribe(Ipc.LIVE_CHANGED, callback),
   onNotchToggle: (callback: (payload: { instant: boolean }) => void) => subscribe(Ipc.NOTCH_TOGGLE, callback),
   onFocusCreature: (callback: (creatureId: string) => void) => subscribe(Ipc.FOCUS_CREATURE, callback),
   onDockToggle: (callback: () => void) => subscribe(Ipc.DOCK_TOGGLE, callback),
@@ -44,6 +48,7 @@ const api: HqApiType = {
   decideApproval: (decision: ApprovalDecisionType): Promise<void> => ipcRenderer.invoke(Ipc.APPROVAL_DECIDE, decision),
   setAutonomy: (id: string, autonomy: AutonomyType): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_AUTONOMY, id, autonomy),
   setModel: (id: string, model: string): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_MODEL, id, model),
+  setEffort: (id: string, effort: string): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_EFFORT, id, effort),
   setEngine: (id: string, engine: string): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_ENGINE, id, engine),
   engineModels: (engine: string) => ipcRenderer.invoke(Ipc.ENGINE_MODELS, engine),
   setSprite: (id: string, file: File): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_SPRITE, id, webUtils.getPathForFile(file)),
@@ -56,6 +61,10 @@ const api: HqApiType = {
   createThread: (request: ThreadCreateRequestType): Promise<string> => ipcRenderer.invoke(Ipc.THREAD_CREATE, request),
   archiveThread: (id: string, removeWorktree: boolean): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_ARCHIVE, id, removeWorktree),
   clearThread: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_CLEAR, creatureId, threadId),
+  compactThread: (creatureId: string, threadId?: string): Promise<string> => ipcRenderer.invoke(Ipc.THREAD_COMPACT, creatureId, threadId),
+  openThreadInTerminal: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_TERMINAL, creatureId, threadId),
+  checkUpdate: (): Promise<UpdateInfoType | undefined> => ipcRenderer.invoke(Ipc.UPDATE_CHECK),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke(Ipc.UPDATE_INSTALL),
   onOpenView: (callback: (view: string) => void) => subscribe(Ipc.OPEN_VIEW, callback),
   labState: (): Promise<LabStateType> => ipcRenderer.invoke(Ipc.LAB_STATE),
   getSettings: (): Promise<ProfileSettingsType> => ipcRenderer.invoke(Ipc.SETTINGS_GET),

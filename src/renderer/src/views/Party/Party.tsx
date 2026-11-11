@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
-import { AttachmentKind, QuestKind } from '@shared/constants';
+import { AttachmentKind, EngineAdapter, QuestKind } from '@shared/constants';
 import type { AppStateType, AttachmentInfoType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
@@ -9,6 +9,7 @@ import AttachmentChip from '../../components/AttachmentChip/AttachmentChip';
 import ThreadSheet from '../ThreadSheet/ThreadSheet';
 import CreatureControls from '../../components/CreatureControls/CreatureControls';
 import { renderIf } from '../../lib/renderIf';
+import { useQuestLive } from '../../hooks/useQuestLive';
 import { AUTONOMY_INFO, creatureById, isLive } from '../../lib/format';
 import './styles.css';
 
@@ -125,11 +126,18 @@ const Party = ({ state, creatureId }: PropsType) => {
   );
   const approvals = state.approvals.filter((approval) => approval.creatureId === creatureId);
   const busy = quests.some(isLive);
+  const isClaude = !!creature && state.engineAdapters[creature.engine] === EngineAdapter.CLAUDE;
+  const canCompact = isClaude && !busy && quests.length > 0;
   const lastEventCount = quests[quests.length - 1]?.events.length ?? 0;
+  const lastQuest = quests[quests.length - 1];
+  const lastLive = useQuestLive(lastQuest && isLive(lastQuest) ? lastQuest.id : undefined);
+  // Follow the reply as it types, one line at a time rather than on every token.
+  const draftLines = lastLive?.draft.split('\n').length ?? 0;
+  const draftChunks = Math.floor((lastLive?.draft.length ?? 0) / 160);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' });
-  }, [creatureId, quests.length, lastEventCount, approvals.length]);
+  }, [creatureId, quests.length, lastEventCount, approvals.length, draftLines, draftChunks]);
 
   const send = useCallback((event?: FormEvent) => {
     event?.preventDefault();
@@ -189,6 +197,24 @@ const Party = ({ state, creatureId }: PropsType) => {
             );
           })}
           <button className="party-tab party-tab-add" onClick={() => setCreatingThread(true)}>+ Thread</button>
+          {renderIf(!thread && canCompact, (
+            <button
+              className="btn sm ghost party-clear-btn"
+              onClick={() => void window.hq.openThreadInTerminal(creature.id)}
+              title="Continue this chat in Claude Code in Terminal (same session)"
+            >
+              Terminal
+            </button>
+          ))}
+          {renderIf(!thread && canCompact, (
+            <button
+              className="btn sm ghost party-clear-btn"
+              onClick={() => void window.hq.compactThread(creature.id)}
+              title="Summarize this chat in place (Claude Code /compact): keeps the context, costs less per step"
+            >
+              Compact
+            </button>
+          ))}
           {renderIf(!thread && quests.length > 0, (
             <button
               className="btn sm ghost party-clear-btn"
@@ -208,6 +234,8 @@ const Party = ({ state, creatureId }: PropsType) => {
             {renderIf(!!thread.note, <span className="faint">{thread.note}</span>)}
             <span className="party-thread-actions">
               {renderIf(!!thread.cwd, <button className="btn sm ghost" onClick={() => void window.hq.openPath(thread.cwd)}>Open folder</button>)}
+ {renderIf(canCompact, <button className="btn sm ghost" title="Continue this chat in Claude Code in Terminal (same session)" onClick={() => void window.hq.openThreadInTerminal(creature.id, thread.id)}>Terminal</button>)}
+              {renderIf(canCompact, <button className="btn sm ghost" title="Summarize this chat in place (Claude Code /compact)" onClick={() => void window.hq.compactThread(creature.id, thread.id)}>Compact</button>)}
               {renderIf(quests.length > 0, <button className="btn sm ghost" onClick={() => void window.hq.clearThread(creature.id, thread.id)}>Clear</button>)}
               <button className="btn sm ghost" onClick={() => { void window.hq.archiveThread(thread.id, false); setThreadId(undefined); }}>Archive</button>
               {renderIf(!!thread.worktree, <button className="btn sm ghost danger" onClick={() => { void window.hq.archiveThread(thread.id, true); setThreadId(undefined); }}>Archive + remove worktree</button>)}
@@ -233,7 +261,7 @@ const Party = ({ state, creatureId }: PropsType) => {
           +
           <input type="file" multiple onChange={onPick} />
         </label>
-        <textarea ref={inputRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} onPaste={onPaste} placeholder={busy ? `${creature.name} is working. You can queue another message.` : `Message ${creature.name} · Shift+Enter for a new line · drop or paste files and screenshots`} />
+        <textarea ref={inputRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} onPaste={onPaste} placeholder={busy ? `${creature.name} is working. ${isClaude ? 'Send a message to steer it mid-task.' : 'New messages wait until it finishes.'}` : `Message ${creature.name} · Shift+Enter for a new line · drop or paste files and screenshots`} />
         <button className="btn primary sm" type="submit" disabled={!draft.trim()}>Send</button>
       </form>
       {renderIf(dragging, <div className="party-drop">Drop files for {creature.name}</div>)}

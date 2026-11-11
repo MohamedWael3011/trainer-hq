@@ -19,6 +19,8 @@ type PropsType = {
   state: AppStateType;
 };
 
+// "Later" hides the banner until an even newer build appears.
+const DISMISSED_UPDATE_KEY = 'thq.dismissedUpdate';
 const NAV: { view: ViewType; label: string }[] = [
   { view: View.PARTY, label: 'Party' },
   { view: View.QUESTS, label: 'Quests' },
@@ -37,6 +39,21 @@ const KEY_DOWN = 'ArrowDown';
 
 const Dashboard = ({ state }: PropsType) => {
   const [view, setView] = useState<ViewType>(View.PARTY);
+  const [dismissedUpdate, setDismissedUpdate] = useState<string>(() => {
+    try {
+      return localStorage.getItem(DISMISSED_UPDATE_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const dismissUpdate = (sha: string): void => {
+    setDismissedUpdate(sha);
+    try {
+      localStorage.setItem(DISMISSED_UPDATE_KEY, sha);
+    } catch {
+      // Not remembered; the banner just comes back next launch.
+    }
+  };
   const [selected, setSelected] = useState<string>(state.creatures[0]?.id ?? '');
   const [hatching, setHatching] = useState(false);
   const [addingProfile, setAddingProfile] = useState(false);
@@ -182,6 +199,22 @@ const Dashboard = ({ state }: PropsType) => {
               </div>
             </div>
           ))}
+          {renderIf(!!state.update && dismissedUpdate !== state.update.latestSha, state.update ? (
+            <div className="dash-auth dash-update">
+              <div>
+                <b>A new Trainer HQ build is out: {state.update.behindBy === 1 ? '1 new change' : `${state.update.behindBy} new changes`} on {state.update.branch}.</b>
+                <p>
+                  {state.update.latestMessage ? <>Latest: {state.update.latestMessage}. </> : null}
+                  Update pulls it and reinstalls in Terminal (<code>git pull && npm run install:app</code>).{' '}
+                  <a href={state.update.compareUrl} target="_blank" rel="noreferrer">What changed</a>
+                </p>
+              </div>
+              <div className="dash-auth-actions">
+                <button className="btn primary sm" onClick={() => void window.hq.installUpdate()}>Update</button>
+                <button className="btn sm" onClick={() => dismissUpdate(state.update?.latestSha ?? '')}>Later</button>
+              </div>
+            </div>
+          ) : null)}
           {renderIf(state.errors.length > 0, <div className="dash-errors selectable">{state.errors.join('\n')}</div>)}
           {renderIf(view === View.PARTY, <Party state={state} creatureId={selected} />)}
           {renderIf(view === View.QUESTS, <Quests state={state} onOpen={(id) => { setSelected(id); setView(View.PARTY); }} />)}

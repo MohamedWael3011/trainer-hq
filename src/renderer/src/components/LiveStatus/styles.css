@@ -1,0 +1,15 @@
+.ls { display: grid; gap: 2px; font-size: 12px; min-width: 0; }
+.ls-line { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; color: var(--accent); }
+.ls-spinner { width: 1ch; text-align: center; font-weight: 700; }
+.ls-verb { font-weight: 700; }
+.ls-detail { color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.ls-waiting { color: var(--amber); }
+.ls-badge { display: inline-flex; align-items: baseline; gap: 5px; flex: none; font-size: 11px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ls-sub { padding-left: 2ch; color: var(--fg-3); overflow-wrap: anywhere; }
+.ql-draft .ql-bubble::after { content: '▍'; color: var(--accent); margin-left: 2px; animation: ls-caret 1s steps(1) infinite; }
+
+@keyframes ls-caret { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ql-draft .ql-bubble::after { animation: none; }
+}

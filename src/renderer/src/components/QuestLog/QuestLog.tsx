@@ -5,6 +5,8 @@ import Sprite from '../Sprite/Sprite';
 import Badge from '../Badge/Badge';
 import Markdown from '../Markdown/Markdown';
 import HandoffCard from '../HandoffCard/HandoffCard';
+import LiveStatus from '../LiveStatus/LiveStatus';
+import { useQuestLive } from '../../hooks/useQuestLive';
 import { renderIf } from '../../lib/renderIf';
 import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, questUsageSummary } from '../../lib/format';
 import './styles.css';
@@ -24,6 +26,8 @@ const ASK_PREFIX = 'ask ';
 const QuestLog = ({ state, quest }: PropsType) => {
   const children = state.quests.filter((entry) => entry.parentId === quest.id).sort((a, b) => a.startedAt - b.startedAt);
   const usage = questUsageSummary(quest);
+  const running = isLive(quest);
+  const live = useQuestLive(running ? quest.id : undefined);
   let childIndex = 0;
   return (
   <div className="ql">
@@ -37,7 +41,7 @@ const QuestLog = ({ state, quest }: PropsType) => {
       }
       if (event.kind === EventKind.TOOL) return <div key={index} className="ql-tool">{event.text}</div>;
       if (event.kind === EventKind.ERROR) return <div key={index} className="ql-error selectable">{event.text}</div>;
-      if (event.kind === EventKind.SYSTEM) return null;
+      if (event.kind === EventKind.SYSTEM) return <div key={index} className="ql-tool">{event.text}</div>;
       return (
         <div key={index} className="ql-bot">
           <Sprite state={state} id={quest.creatureId} className="ql-avatar" />
@@ -45,9 +49,19 @@ const QuestLog = ({ state, quest }: PropsType) => {
         </div>
       );
     })}
+    {renderIf(running && !!live?.draft, (
+      <div className="ql-bot ql-draft">
+        <Sprite state={state} id={quest.creatureId} className="ql-avatar" />
+        <div className="ql-bubble"><Markdown text={live?.draft ?? ''} baseDir={quest.cwd} /></div>
+      </div>
+    ))}
     <div className="ql-meta">
-      <Badge tone={STATUS_TONE[quest.status]} dot>{STATUS_LABEL[quest.status]}</Badge>
-      <span className="faint">{duration(quest)}</span>
+      {running ? <LiveStatus quest={quest} live={live} /> : (
+        <>
+          <Badge tone={STATUS_TONE[quest.status]} dot>{STATUS_LABEL[quest.status]}</Badge>
+          <span className="faint">{duration(quest)}</span>
+        </>
+      )}
       {renderIf(!!usage, (
         <span className={`ql-usage${usage?.expensive ? ' ql-usage-warn' : ''}`} title={usage?.detail}>
           {usage?.label}

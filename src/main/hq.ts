@@ -14,6 +14,8 @@ import {
   type QuestKindType,
 } from '@shared/constants';
 import type {
+  UpdateInfoType,
+  QuestLiveType,
   AppStateType,
   AuthStatusType,
   ApprovalDecisionType,
@@ -34,14 +36,16 @@ import type {
 } from '@shared/types';
 import { ApprovalBroker, type AskRequestType } from './approvals';
 import { attachmentDirs, detectPaths, installSkill, prepareAttachments } from './attachments';
-import { checkAuth, openLoginTerminal } from './auth';
+import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from './auth';
+import { checkForUpdate } from './updates';
+import { claudeFlagSupport, resetFlagSupport } from './engines/claudeFlags';
 import { buildSystemPrompt } from './brain';
 import { addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
 import { approveNote, buildProposalPrompt, dismissNote, inlineProposals, listDaycare, parseProposals, worthReviewing, writeProposals, type ProposalType } from './daycare';
 import { runClaude } from './engines/claude';
 import { runCli } from './engines/cli';
 import type { RunHandleType } from './engines/types';
-import { planClaudeRun } from './guard';
+import { planClaudeRun, sessionContextFromLog } from './guard';
 import { buildHatchPrompt, hatcheryCreature } from './hatchery';
 import { resourcesDir } from './paths';
 import { QuestStore } from './quests';
@@ -58,8 +62,13 @@ const AGY_SESSION_PREFIX = 'agy:';
 const DAYCARE_MODEL = 'haiku';
 
 const STATE_THROTTLE_MS = 60;
+// Live typing and token counts update many times a second; ~10 frames a second reads as smooth.
+const LIVE_THROTTLE_MS = 100;
 const HANDOFF_TIMEOUT_MS = 10 * 60_000;
 const AUTH_REFRESH_MS = 10 * 60_000;
+// GitHub allows 60 anonymous API calls an hour; a check every few hours is plenty.
+const UPDATE_CHECK_MS = 3 * 60 * 60_000;
+const UPDATE_FIRST_CHECK_MS = 20_000;
 const AUTH_ERROR_PATTERN = /\/login|not logged in|unauthori[sz]ed|invalid api key|authentication|401/i;
 
 export class Hq {
@@ -73,7 +82,15 @@ export class Hq {
   private ui = loadUi();
   private auth: AuthStatusType | undefined;
   private authTimer: NodeJS.Timeout | undefined;
+  private updateTimer: NodeJS.Timeout | undefined;
+  private update: UpdateInfoType | undefined;
   private running = new Map<string, RunHandleType>();
+  // The chat quest currently running per session, and messages waiting for it to finish.
+  private liveChats = new Map<string, string>();
+  private live: Record<string, QuestLiveType> = {};
+  private liveListeners = new Set<(live: Record<string, QuestLiveType>) => void>();
+  private liveTimer: NodeJS.Timeout | undefined;
+  private chatQueue = new Map<string, ChatRequestType[]>();
   private stopWatching: (() => void) | undefined;
   private emitTimer: NodeJS.Timeout | undefined;
   private listeners = new Set<(state: AppStateType) => void>();
@@ -144,6 +161,28 @@ export class Hq {
     this.emit();
   }
 
+  getLive(): Record<string, QuestLiveType> {
+    return this.live;
+  }
+
+  onLive(listener: (live: Record<string, QuestLiveType>) => void): () => void {
+    this.liveListeners.add(listener);
+    return () => this.liveListeners.delete(listener);
+  }
+
+  private setLive(questId: string, value: QuestLiveType | undefined): void {
+    if (value) this.live = { ...this.live, [questId]: value };
+    else if (this.live[questId]) {
+      const { [questId]: _removed, ...rest } = this.live;
+      this.live = rest;
+    } else return;
+    if (this.liveTimer) return;
+    this.liveTimer = setTimeout(() => {
+      this.liveTimer = undefined;
+      this.liveListeners.forEach((listener) => listener(this.live));
+    }, LIVE_THROTTLE_MS);
+  }
+
   onState(listener: (state: AppStateType) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -176,6 +215,7 @@ export class Hq {
       ui: this.ui,
       labEnabled: !!this.profile.lab,
       auth: this.auth,
+      update: this.update,
       errors: this.errors,
     };
   }
@@ -220,15 +260,27 @@ export class Hq {
     const threadContext = thread
       ? `You are in the thread "${thread.title}". Work in ${thread.cwd ?? cwd}${thread.branch ? ` on branch ${thread.branch}` : ''}${thread.pr ? ` (PR ${thread.pr})` : ''}${thread.worktree ? '. This is an isolated git worktree just for this thread.' : '.'} Keep this thread focused on that work.`
       : '';
-    const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, threadContext);
     // Claude and Antigravity session ids live in the same slot, so tag Antigravity's to keep them apart.
-    const stored = options.resume ? this.quests.sessionFor(sessionKey) : undefined;
+    let stored = options.resume ? this.quests.sessionFor(sessionKey) : undefined;
+    let recapContext = '';
+    const isCompact = /^\/compact\b/.test(prompt.trim());
+    if (stored && !isCompact && engine.adapter === EngineAdapter.CLAUDE && !stored.startsWith(AGY_SESSION_PREFIX) && this.isColdAndLarge(stored)) {
+      const recap = this.quests.recap(stored);
+      this.quests.clearSession(sessionKey);
+      stored = undefined;
+      recapContext = recap
+        ? `This chat continues an earlier conversation that was closed to save tokens (it was large and idle). The last exchanges were:\n\n${recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`
+        : '';
+      this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: 'Started a fresh session: the previous one was large and idle, so resuming it would have re-billed the whole conversation. A short recap was carried over.' });
+    }
+    const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, [threadContext, recapContext].filter(Boolean).join('\n\n'));
     const agySession = stored?.startsWith(AGY_SESSION_PREFIX) ? stored.slice(AGY_SESSION_PREFIX.length) : undefined;
     const claudeSession = stored && !stored.startsWith(AGY_SESSION_PREFIX) ? stored : undefined;
     const callbacks = {
       onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => this.quests.addEvent(quest.id, event),
       onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : sessionId),
       onQuestUsage: (questUsage: QuestUsageType) => this.quests.setUsage(quest.id, questUsage),
+      onLive: (live: QuestLiveType) => this.setLive(quest.id, live),
       onUsage: (usage: UsageType) => {
         this.usage = usage;
         this.emit();
@@ -243,6 +295,8 @@ export class Hq {
         questId: quest.id,
         resumeSessionId: claudeSession,
         skipWorktree: !!thread?.worktree,
+        supports: claudeFlagSupport(engine.bin, this.env()),
+        sessionName: `${creature.name} · ${thread?.title ?? 'Main'}`,
         bridge: {
           serverScript: join(resourcesDir(), 'mcp', 'permission-server.cjs'),
           nodeBinary: process.execPath,
@@ -263,8 +317,29 @@ export class Hq {
       handle = runCli({ bin: engine.bin, args: engine.args, prompt, systemPrompt, cwd, env: this.env(), timeoutMs, callbacks });
     }
     this.running.set(quest.id, handle);
+    if (kind === QuestKind.CHAT) this.liveChats.set(sessionKey, quest.id);
     void handle.done.then((outcome) => {
       this.running.delete(quest.id);
+      this.setLive(quest.id, undefined);
+      if (this.liveChats.get(sessionKey) === quest.id) {
+        this.liveChats.delete(sessionKey);
+        // Send what was queued behind this run, in order, as one message. A stopped run drops the queue.
+        const queued = this.chatQueue.get(sessionKey) ?? [];
+        this.chatQueue.delete(sessionKey);
+        if (queued.length > 0 && !outcome.cancelled) {
+          setTimeout(() => {
+            try {
+              this.chat({
+                ...queued[0],
+                text: queued.map((entry) => entry.text).join('\n\n'),
+                attachments: queued.flatMap((entry) => entry.attachments ?? []),
+              });
+            } catch {
+              // The creature or thread is gone; nothing to send to.
+            }
+          }, 0);
+        }
+      }
       this.approvals.denyAllForQuest(quest.id);
       if (outcome.usage) this.quests.setUsage(quest.id, outcome.usage);
       if (outcome.ok) {
@@ -293,9 +368,35 @@ export class Hq {
     return quest.id;
   }
 
+  // Past the idle limit the prompt cache has expired, so resuming re-bills the whole conversation
+  // as a cache write. For a big session a fresh start with a recap is far cheaper.
+  private isColdAndLarge(sessionId: string): boolean {
+    const { idleResetMinutes, idleResetMinTokens } = this.profile.session;
+    if (idleResetMinutes <= 0) return false;
+    const activity = this.quests.sessionActivity(sessionId);
+    if (!activity || Date.now() - activity.at < idleResetMinutes * 60_000) return false;
+    const size = activity.contextTokens ?? sessionContextFromLog(sessionId, this.profile.claudeConfigDir);
+    return (size ?? 0) >= idleResetMinTokens;
+  }
+
   chat(request: ChatRequestType): string {
     const creature = this.creature(request.creatureId);
     const thread = this.threads.get(request.threadId);
+    const sessionKey = threadKey(creature.id, thread?.id);
+    const liveId = this.liveChats.get(sessionKey);
+    if (liveId) {
+      const hasFiles = (request.attachments ?? []).length > 0 || detectPaths(request.text).length > 0;
+      const isCommand = request.text.trim().startsWith('/');
+      // Like the terminal: a message sent while Claude works is picked up mid-task by the same run.
+      // Files need new folder access and commands need a turn of their own, so those wait instead.
+      if (!hasFiles && !isCommand && this.running.get(liveId)?.send?.(request.text)) {
+        this.quests.addEvent(liveId, { kind: EventKind.USER, text: request.text });
+        return liveId;
+      }
+      this.chatQueue.set(sessionKey, [...(this.chatQueue.get(sessionKey) ?? []), request]);
+      this.quests.addEvent(liveId, { kind: EventKind.SYSTEM, text: `Queued, sends when this reply finishes: ${request.text.replace(/\s+/g, ' ').slice(0, 120)}` });
+      return liveId;
+    }
     const paths = Array.from(new Set([...(request.attachments ?? []), ...detectPaths(request.text)]));
     const prepared = prepareAttachments(paths);
     if (prepared.length === 0) return this.launch(creature, QuestKind.CHAT, request.text, { resume: true, record: true, thread });
@@ -414,7 +515,37 @@ export class Hq {
     this.emit();
   }
 
+  // Claude Code's own /compact: summarizes the chat in place so it keeps its context but costs less per step.
+  compactThread(creatureId: string, threadId?: string): string {
+    const creature = this.creature(creatureId);
+    const thread = this.threads.get(threadId);
+    const sessionKey = threadKey(creature.id, thread?.id);
+    if (this.liveChats.has(sessionKey)) throw new Error(`${creature.name} is still working. Compact when the reply is done.`);
+    if (!this.quests.sessionFor(sessionKey)) throw new Error('Nothing to compact yet.');
+    return this.launch(creature, QuestKind.CHAT, '/compact', { resume: true, record: true, thread });
+  }
+
+  // Hand the chat to the real Claude Code terminal UI: same session, same folder, same notes access.
+  openThreadInTerminal(creatureId: string, threadId?: string): void {
+    const creature = this.creature(creatureId);
+    const thread = this.threads.get(threadId);
+    const sessionKey = threadKey(creature.id, thread?.id);
+    if (this.liveChats.has(sessionKey)) throw new Error(`${creature.name} is still working. Open it in the terminal when the reply is done.`);
+    const stored = this.quests.sessionFor(sessionKey);
+    if (!stored || stored.startsWith(AGY_SESSION_PREFIX)) throw new Error('This chat has no Claude Code session to open yet.');
+    const folder = thread?.cwd ?? creature.cwd;
+    const cwd = folder && existsSync(folder) ? folder : this.profile.vault;
+    openSessionTerminal({
+      bin: (this.profile.engines[creature.engine] ?? this.profile.engines.claude).bin,
+      cwd,
+      sessionId: stored,
+      addDirs: [creature.dir, ...creature.addDirs].filter((dir) => existsSync(dir)),
+      claudeConfigDir: this.profile.claudeConfigDir,
+    });
+  }
+
   clearThread(creatureId: string, threadId?: string): void {
+    this.chatQueue.delete(threadKey(creatureId, threadId));
     const removedIds = this.quests.clearThread(creatureId, threadId);
     removedIds.forEach((questId) => {
       this.running.get(questId)?.cancel();
@@ -450,6 +581,11 @@ export class Hq {
 
   setModel(creatureId: string, model: string): void {
     updateCreatureFile(this.creature(creatureId), { model: model.trim() || undefined });
+    this.reloadVault();
+  }
+
+  setEffort(creatureId: string, effort: string): void {
+    updateCreatureFile(this.creature(creatureId), { effort: effort.trim() || undefined });
     this.reloadVault();
   }
 
@@ -517,6 +653,7 @@ export class Hq {
   }
 
   prerequisites(): Promise<PrerequisiteType[]> {
+    resetFlagSupport();
     return checkPrerequisites(this.profile.engines.claude.bin, this.env());
   }
 
@@ -560,10 +697,31 @@ export class Hq {
     return this.profile.vault;
   }
 
+  // Look for a newer build on GitHub once shortly after launch, then every few hours.
+  startUpdateChecks(): void {
+    if (this.updateTimer) return;
+    setTimeout(() => void this.checkUpdate(), UPDATE_FIRST_CHECK_MS);
+    this.updateTimer = setInterval(() => void this.checkUpdate(), UPDATE_CHECK_MS);
+  }
+
+  async checkUpdate(): Promise<UpdateInfoType | undefined> {
+    this.update = await checkForUpdate();
+    this.emit();
+    return this.update;
+  }
+
+  // Pull the new commits and reinstall, in Terminal so the user sees every step.
+  installUpdate(): void {
+    const dir = this.update?.sourceDir;
+    if (!dir || !existsSync(join(dir, '.git'))) throw new Error('The source folder this app was built from is gone. Pull and run npm run install:app in your checkout.');
+    runInTerminal(`cd ${JSON.stringify(dir)} && git pull --ff-only && npm install && npm run install:app`);
+  }
+
   stop(): void {
     this.running.forEach((handle) => handle.cancel());
     this.stopWatching?.();
     if (this.authTimer) clearInterval(this.authTimer);
+    if (this.updateTimer) clearInterval(this.updateTimer);
     this.lab.stopAll();
     this.approvals.stop();
   }

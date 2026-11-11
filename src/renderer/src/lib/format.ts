@@ -82,6 +82,8 @@ export const formatCost = (costUsd: number | undefined): string | undefined => {
   return `$${costUsd.toFixed(2)}`;
 };
 
+const LARGE_CONTEXT_TOKENS = 150_000;
+
 export const questUsageSummary = (
   quest: QuestType,
 ): { label: string; detail: string; expensive: boolean } | undefined => {
@@ -96,8 +98,10 @@ export const questUsageSummary = (
     parts.push(`${formatTokens(freshTokens > 0 ? freshTokens : totalTokens)} tok`);
     if (usage.cacheReadTokens > 0) parts.push(`${formatTokens(usage.cacheReadTokens)} cached`);
   }
+  if (usage.contextTokens) parts.push(`ctx ${formatTokens(usage.contextTokens)}`);
   if (costText) parts.push(costText);
   const detailParts = [
+    usage.contextTokens ? `Conversation size: ${usage.contextTokens.toLocaleString()} tokens (resent on every step; Clear the chat to reset)` : undefined,
     usage.model ? `Model: ${usage.model}` : undefined,
     `Input: ${usage.inputTokens.toLocaleString()}`,
     `Output: ${usage.outputTokens.toLocaleString()}`,
@@ -105,7 +109,7 @@ export const questUsageSummary = (
     usage.cacheReadTokens > 0 ? `Cache read: ${usage.cacheReadTokens.toLocaleString()}` : undefined,
     usage.costUsd !== undefined ? `Cost: $${usage.costUsd.toFixed(4)}` : undefined,
   ].filter(Boolean);
-  const expensive = (usage.costUsd ?? 0) >= EXPENSIVE_COST_USD || freshTokens >= EXPENSIVE_FRESH_TOKENS;
+  const expensive = (usage.costUsd ?? 0) >= EXPENSIVE_COST_USD || freshTokens >= EXPENSIVE_FRESH_TOKENS || (usage.contextTokens ?? 0) >= LARGE_CONTEXT_TOKENS;
   return {
     label: parts.join(' · '),
     detail: detailParts.join(' · '),

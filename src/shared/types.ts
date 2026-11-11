@@ -30,6 +30,8 @@ export type CreatureType = {
   sprite: string;
   engine: string;
   model?: string;
+  // Claude effort (low, medium, high, xhigh, max). Unset uses the user's own Claude Code default.
+  effort?: string;
   cwd?: string;
   addDirs: string[];
   brain: string[];
@@ -54,6 +56,33 @@ export type QuestUsageType = {
   cacheWriteTokens: number;
   costUsd?: number;
   model?: string;
+  // Size of the conversation on the last API call: what the next message has to resend.
+  contextTokens?: number;
+};
+
+// A newer build is on GitHub than the one running.
+export type UpdateInfoType = {
+  behindBy: number;
+  branch: string;
+  latestSha: string;
+  latestMessage: string;
+  compareUrl: string;
+  // The checkout this app was built from, so "Update" can pull and reinstall there.
+  sourceDir: string;
+};
+
+// What a running quest is doing right now. Streamed on its own channel, never persisted.
+export type LivePhaseType = 'starting' | 'thinking' | 'writing' | 'tool' | 'compacting';
+
+export type QuestLiveType = {
+  phase: LivePhaseType;
+  // Output tokens so far this run, counted like the terminal's "↓ 12.4k tokens".
+  outputTokens: number;
+  // The reply being written, before its message is complete.
+  draft: string;
+  tool?: string;
+  // Helper agents (Claude Code subagents) still running.
+  agents: string[];
 };
 
 export type QuestType = {
@@ -172,6 +201,7 @@ export type AppStateType = {
   ui: UiStateType;
   labEnabled: boolean;
   auth?: AuthStatusType;
+  update?: UpdateInfoType;
   errors: string[];
 };
 

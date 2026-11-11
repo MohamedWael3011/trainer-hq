@@ -23,7 +23,14 @@ guard:
     maxMinutes: 45
     maxPlanUsage: 0.85
     worktree: true
+    # maxBudgetUsd: 10    # optional: stop an unattended run once its estimated API cost passes this
   alwaysDeny: []
+
+# Every tool call resends the whole conversation, so long sessions burn tokens fast.
+session:
+  autocompact: 160000     # compact once the conversation reaches this size (100000-1000000, or auto)
+  idleResetMinutes: 60    # after this long idle the prompt cache is cold: start fresh with a short recap instead (0 = never)
+  idleResetMinTokens: 40000  # only reset sessions at least this big
 
 daycare:
   mode: free            # free | ai | off

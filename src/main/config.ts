@@ -15,7 +15,18 @@ export type GuardConfigType = {
   fullAutoMaxMinutes: number;
   fullAutoMaxPlanUsage: number;
   fullAutoWorktree: boolean;
+  fullAutoMaxBudgetUsd?: number;
   alwaysDeny: string[];
+};
+
+// Keeps Claude sessions small: every tool call resends the whole conversation, so a long-lived session
+// gets expensive fast and a cold resume after a break re-bills all of it as a cache write.
+export type SessionConfigType = {
+  autocompactTokens: number;
+  idleResetMinutes: number;
+  idleResetMinTokens: number;
+  // Lighter model to retry on when the creature's model is overloaded ('' turns it off).
+  fallbackModel: string;
 };
 
 export type LabConfigType = {
@@ -39,6 +50,7 @@ export type ProfileConfigType = {
   repos: Record<string, string>;
   engines: Record<string, EngineConfigType>;
   guard: GuardConfigType;
+  session: SessionConfigType;
   daycareMode: DaycareModeType;
   daycareAutoApproveFullAuto: boolean;
   spriteOverrides: string;
@@ -57,6 +69,30 @@ const DEFAULT_PROFILE_ID = 'main';
 const DEFAULT_VAULT = '~/Documents/trainer-hq-vault';
 const DEFAULT_ENGINE = 'claude';
 const DEFAULT_OVERRIDES = 'sprites/overrides';
+const DEFAULT_AUTOCOMPACT_TOKENS = 160_000;
+const MIN_AUTOCOMPACT_TOKENS = 100_000;
+const MAX_AUTOCOMPACT_TOKENS = 1_000_000;
+const DEFAULT_IDLE_RESET_MINUTES = 60;
+const DEFAULT_IDLE_RESET_MIN_TOKENS = 40_000;
+const DEFAULT_FALLBACK_MODEL = 'sonnet';
+
+export const toSession = (value: unknown): SessionConfigType => {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const compact = Number(raw.autocompact);
+  const idle = Number(raw.idleResetMinutes);
+  const minTokens = Number(raw.idleResetMinTokens);
+  return {
+    // 0 means "leave it to the CLI default"; otherwise clamp to what `claude --autocompact` accepts.
+    autocompactTokens: raw.autocompact === 0 || raw.autocompact === 'auto'
+      ? 0
+      : Number.isFinite(compact) && compact > 0
+        ? Math.min(MAX_AUTOCOMPACT_TOKENS, Math.max(MIN_AUTOCOMPACT_TOKENS, compact))
+        : DEFAULT_AUTOCOMPACT_TOKENS,
+    idleResetMinutes: Number.isFinite(idle) && idle >= 0 && raw.idleResetMinutes !== undefined ? idle : DEFAULT_IDLE_RESET_MINUTES,
+    fallbackModel: typeof raw.fallbackModel === 'string' ? raw.fallbackModel.trim() : DEFAULT_FALLBACK_MODEL,
+    idleResetMinTokens: Number.isFinite(minTokens) && minTokens >= 0 && raw.idleResetMinTokens !== undefined ? minTokens : DEFAULT_IDLE_RESET_MIN_TOKENS,
+  };
+};
 
 export const DEFAULT_ALWAYS_DENY = [
   'Bash(git push:*)',
@@ -208,8 +244,10 @@ export const loadProfileConfig = (vaultSetting: string): ProfileConfigType => {
       fullAutoMaxMinutes: Number(fullAuto.maxMinutes) > 0 ? Number(fullAuto.maxMinutes) : 45,
       fullAutoMaxPlanUsage: Number(fullAuto.maxPlanUsage) > 0 ? Number(fullAuto.maxPlanUsage) : 0.85,
       fullAutoWorktree: fullAuto.worktree !== false,
+      fullAutoMaxBudgetUsd: Number(fullAuto.maxBudgetUsd) > 0 ? Number(fullAuto.maxBudgetUsd) : undefined,
       alwaysDeny: [...DEFAULT_ALWAYS_DENY, ...((guard.alwaysDeny ?? []) as string[])],
     },
+    session: toSession(data.session),
     daycareMode: toDaycareMode(daycare),
     daycareAutoApproveFullAuto: daycare.autoApproveFullAuto === true,
     spriteOverrides: join(vault, typeof data.spriteOverrides === 'string' ? data.spriteOverrides : DEFAULT_OVERRIDES),
