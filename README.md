@@ -217,7 +217,7 @@ Each creature has a **Main** thread and as many extra threads as you like (**+ T
 
 Every step Claude takes (each file read, search or edit) resends the whole conversation so far, so the cost of a chat grows with its length, not with how short your message is. Trainer HQ leans on Claude Code's own mechanisms to keep that in check:
 
-- **Auto-compact at 160k** (`--autocompact`). A long chat is summarized by Claude Code before it gets expensive, instead of growing toward the 1M window.
+- **Auto-compact at 120k** (`--autocompact`). Claude Code summarizes the chat at about 80% of that (~96k), so each step resends under 100k instead of the chat growing toward the 1M window.
 - **Fresh start after a break.** Claude Code's prompt cache lasts about an hour. Resuming a big chat after that re-bills the whole conversation at a higher rate. So when a chat has been idle over an hour and is above 40k tokens, the next message starts a new session with a short recap of the last few exchanges. The chat shows a note when this happens.
 - **Frozen prompt per session.** Claude Code records the system prompt once per conversation, so brain edits never invalidate the cache mid-chat. They apply from the next fresh session or compaction.
 - **Shared cache across creatures** (`--exclude-dynamic-system-prompt-sections`). Per-folder details move out of the system prompt so fresh sessions reuse more of the cached prefix.
@@ -228,7 +228,7 @@ Every step Claude takes (each file read, search or edit) resends the whole conve
 - **Overloaded? Retry instead of failing** (`--fallback-model`). Opus and Fable creatures retry on Sonnet when their model is overloaded. Sonnet and Haiku creatures never fall back to something pricier.
 - **Messages while it works go into the same run.** Like typing in the terminal mid-task, a message sent while a Claude creature is working is picked up at its next step (`--input-format stream-json`). There's no second run resending the whole chat. Messages with files, and messages to other engines, wait and go out together when the reply finishes.
 
-Every reply shows its tokens and the conversation size (`ctx 120k`), which turns amber above 150k. Compactions show as a note (`Auto-compacted the conversation: 160k → 22k tokens`). When a topic is done, **Clear** the chat: that's the single biggest saving, the same as opening a new terminal chat. To keep going on the same topic with a lighter chat, press **Compact** (or type `/compact`), which runs Claude Code's own compaction. **Terminal** opens the same chat in Claude Code in Terminal (`claude --resume`, named like `Scout · Main`), for when you want the full CLI.
+Every reply shows its tokens and the conversation size (`ctx 120k`), which turns amber above 100k. Compactions show as a note (`Auto-compacted the conversation: 96k → 17k tokens`). When a topic is done, **Clear** the chat: that's the single biggest saving, the same as opening a new terminal chat. To keep going on the same topic with a lighter chat, press **Compact** (or type `/compact`), which runs Claude Code's own compaction. **Terminal** opens the same chat in Claude Code in Terminal (`claude --resume`, named like `Scout · Main`), for when you want the full CLI.
 </details>
 
 <details>
@@ -285,7 +285,7 @@ guard:
     - "Bash(gh pr merge:*)"
 
 session:                              # see "Keeping token use low"
-  autocompact: 160000                 # 100000-1000000, or auto (Claude Code's default)
+  autocompact: 120000                 # 100000-1000000, or auto (Claude Code's default)
   idleResetMinutes: 60                # 0 = always resume, however long the chat sat idle
   idleResetMinTokens: 40000
   fallbackModel: sonnet               # retry on this when Opus/Fable is overloaded ('' = off)

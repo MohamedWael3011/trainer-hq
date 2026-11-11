@@ -6,7 +6,7 @@ import type { CreatureType } from '@shared/types';
 const profile = {
   vault: '/nonexistent/vault',
   guard: { fullAutoMaxMinutes: 45, fullAutoMaxPlanUsage: 0.85, fullAutoWorktree: true, fullAutoMaxBudgetUsd: 5, alwaysDeny: [] },
-  session: { autocompactTokens: 160_000, idleResetMinutes: 60, idleResetMinTokens: 40_000, fallbackModel: 'sonnet' },
+  session: { autocompactTokens: 120_000, idleResetMinutes: 60, idleResetMinTokens: 40_000, fallbackModel: 'sonnet' },
 } as unknown as ProfileConfigType;
 
 const creature = {
@@ -21,7 +21,7 @@ const plan = (supports?: (flag: string) => boolean) =>
 describe('planClaudeRun', () => {
   it('passes the token-saving flags on a current CLI', () => {
     const args = plan();
-    expect(args).toEqual(expect.arrayContaining(['--autocompact', '160000', '--effort', 'medium', '--fallback-model', 'sonnet', '--name', 'Scout · Main', '--max-budget-usd', '5', '--exclude-dynamic-system-prompt-sections']));
+    expect(args).toEqual(expect.arrayContaining(['--autocompact', '120000', '--effort', 'medium', '--fallback-model', 'sonnet', '--name', 'Scout · Main', '--max-budget-usd', '5', '--exclude-dynamic-system-prompt-sections']));
   });
 
   it('drops options an older CLI does not know, so the run still starts', () => {

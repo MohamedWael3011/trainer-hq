@@ -7,7 +7,9 @@ const args = process.argv.slice(2);
 if (args[0] === '--help') {
   const all = ['--input-format', '--include-partial-messages', '--forward-subagent-text', '--autocompact', '--effort', '--fallback-model', '--name', '--exclude-dynamic-system-prompt-sections', '--max-budget-usd', '--resume', '--model'];
   const flags = process.env.FAKE_HELP_FLAGS !== undefined ? process.env.FAKE_HELP_FLAGS.split(',').filter(Boolean) : all;
-  process.stdout.write(`Usage: claude [options]\n${flags.map((flag) => `  ${flag} <value>   something`).join('\n')}\n`);
+  // Like the real CLI: ~20 KB of help, written then exit(0) straight away, which truncates on a slow pipe.
+  const pad = Array.from({ length: 250 }, (_, index) => `  --zz-filler-${index} <value>   ${'x'.repeat(50)}`).join('\n');
+  process.stdout.write(`Usage: claude [options]\n\nOptions:\n${pad}\n${flags.map((flag) => `  ${flag} <value>   something`).join('\n')}\n\nCommands:\n  update   Update\n`);
   process.exit(0);
 }
 

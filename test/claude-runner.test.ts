@@ -29,6 +29,13 @@ describe('claudeFlagSupport', () => {
     expect(supports('--autocompact')).toBe(false);
   });
 
+  it('sees options listed past the first 8 KB of a long help text', () => {
+    resetFlagSupport();
+    const supports = claudeFlagSupport(FAKE, process.env);
+    expect(supports('--input-format')).toBe(true);
+    expect(supports('--name')).toBe(true);
+  });
+
   it('assumes a current CLI when --help cannot be read', () => {
     resetFlagSupport();
     expect(claudeFlagSupport('/nonexistent/claude', process.env)('--autocompact')).toBe(true);

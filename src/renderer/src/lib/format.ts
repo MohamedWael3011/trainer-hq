@@ -82,7 +82,7 @@ export const formatCost = (costUsd: number | undefined): string | undefined => {
   return `$${costUsd.toFixed(2)}`;
 };
 
-const LARGE_CONTEXT_TOKENS = 150_000;
+const LARGE_CONTEXT_TOKENS = 100_000;
 
 export const questUsageSummary = (
   quest: QuestType,
