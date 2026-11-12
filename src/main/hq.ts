@@ -358,6 +358,7 @@ export class Hq {
       },
     };
     let handle: RunHandleType;
+    const checkoutBusy = Array.from(this.running.keys()).some((runningId) => this.quests.get(runningId)?.cwd === cwd);
     if (engine.adapter === EngineAdapter.CLAUDE) {
       const plan = planClaudeRun({
         creature,
@@ -365,7 +366,7 @@ export class Hq {
         systemPrompt,
         questId: quest.id,
         resumeSessionId: claudeSession,
-        skipWorktree: !!thread?.worktree,
+        skipWorktree: !!thread?.worktree || !checkoutBusy,
         supports: claudeFlagSupport(engine.bin, this.env()),
         sessionName: `${creature.name} · ${thread?.title ?? 'Main'}`,
         bridge: {

@@ -28,7 +28,7 @@ guard:
 
 # Every tool call resends the whole conversation, so long sessions burn tokens fast.
 session:
-  autocompact: 120000     # compact once the conversation reaches this size (100000-1000000, or auto)
+  autocompact: 200000     # compact once the conversation reaches this size (100000-1000000, or auto)
   idleResetMinutes: 60    # after this long idle the prompt cache is cold: start fresh with a short recap instead (0 = never)
   idleResetMinTokens: 40000  # only reset sessions at least this big
 

@@ -3,7 +3,7 @@ import { toSession } from '../src/main/config';
 
 describe('session config', () => {
   it('uses token-saving defaults when profile.yaml has no session block', () => {
-    expect(toSession(undefined)).toEqual({ autocompactTokens: 120_000, idleResetMinutes: 60, idleResetMinTokens: 40_000, fallbackModel: 'sonnet' });
+    expect(toSession(undefined)).toEqual({ autocompactTokens: 200_000, idleResetMinutes: 60, idleResetMinTokens: 40_000, fallbackModel: 'sonnet' });
   });
 
   it('clamps autocompact to what the CLI accepts', () => {

@@ -205,7 +205,7 @@ Open it in Obsidian (**Open folder as vault**) to browse and edit the brain. Cor
 | Auto-edit | `acceptEdits` | File edits go through; commands still ask |
 | Full auto | `bypassPermissions` | No approvals, inside the guard |
 
-The guard always applies: a built-in deny list (`git push`, `git reset --hard`, `git clean`, `git merge`, `git rebase`, `rm -rf`, `sudo`, `.env` reads) plus your own rules. Full-auto quests run in their own git worktree, stop after a time limit, and won't start when your 5-hour plan usage is above a threshold. A quest that hits your plan limit is **Paused**, not failed. <kbd>⌘ .</kbd> in the notch stops the latest quest.
+The guard always applies: a built-in deny list (`git push`, `git reset --hard`, `git clean`, `git merge`, `git rebase`, `rm -rf`, `sudo`, `.env` reads) plus your own rules. Full-auto quests work directly in the repo checkout when nothing else is running there and get their own git worktree when another quest is, stop after a time limit, and won't start when your 5-hour plan usage is above a threshold. A quest that hits your plan limit is **Paused**, not failed. <kbd>⌘ .</kbd> in the notch stops the latest quest.
 
 Approvals are answered by a tiny MCP server (`resources/mcp/permission-server.cjs`) that Claude calls through `--permission-prompt-tool`, over `127.0.0.1` with a random per-launch token.
 </details>
@@ -221,7 +221,7 @@ Each creature has a **Main** thread and as many extra threads as you like (**+ T
 
 Every step Claude takes (each file read, search or edit) resends the whole conversation so far, so the cost of a chat grows with its length, not with how short your message is. Trainer HQ leans on Claude Code's own mechanisms to keep that in check:
 
-- **Auto-compact at 120k** (`--autocompact`). Claude Code summarizes the chat at about 80% of that (~96k), so each step resends under 100k instead of the chat growing toward the 1M window.
+- **Auto-compact at 200k** (`--autocompact`). Claude Code summarizes the chat a little before it reaches that size, so each step resends well under 200k instead of the chat growing toward the 1M window. A creature with a large brain, many tools or loaded skills can start a chat at 50k or more, and a lower limit leaves it too little room: it compacts every few steps and re-reads the same files each time.
 - **Fresh start after a break.** Claude Code's prompt cache lasts about an hour. Resuming a big chat after that re-bills the whole conversation at a higher rate. So when a chat has been idle over an hour and is above 40k tokens, the next message starts a new session with a short recap of the last few exchanges. The chat shows a note when this happens. This also applies to Antigravity creatures, which never compact. Antigravity doesn't report token counts, so their size is estimated from the text sent and received; that estimate leaves out what its tools read, so it errs low.
 - **Switching engines keeps the thread.** Claude and Antigravity can't resume each other's sessions, so after a creature switches engines its next message starts a fresh session with the same recap, not from nothing.
 - **Frozen prompt per session.** Claude Code records the system prompt once per conversation, so brain edits never invalidate the cache mid-chat. They apply from the next fresh session or compaction.
@@ -292,7 +292,7 @@ guard:
     - "Bash(gh pr merge:*)"
 
 session:                              # see "Keeping token use low"
-  autocompact: 120000                 # 100000-1000000, or auto (Claude Code's default)
+  autocompact: 200000                 # 100000-1000000, or auto (Claude Code's default)
   idleResetMinutes: 60                # 0 = always resume, however long the chat sat idle
   idleResetMinTokens: 40000
   fallbackModel: sonnet               # retry on this when Opus/Fable is overloaded ('' = off)
