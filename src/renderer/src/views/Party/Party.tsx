@@ -144,6 +144,7 @@ const Party = ({ state, creatureId }: PropsType) => {
   const busy = quests.some(isLive);
   const isClaude = !!creature && state.engineAdapters[creature.engine] === EngineAdapter.CLAUDE;
   const canCompact = isClaude && !busy && quests.length > 0;
+  const queued = state.queued.find((entry) => entry.creatureId === creature?.id && entry.threadId === thread?.id);
   const held = state.held.find((entry) => entry.creatureId === creature?.id && entry.threadId === thread?.id);
   const planUsage = state.usage?.fiveHour ?? 0;
   const resetsAt = state.usage?.resetsAt;
@@ -283,6 +284,15 @@ const Party = ({ state, creatureId }: PropsType) => {
       <div className="party-log">
         {renderIf(quests.length === 0, <p className="party-hello muted">{creature.blurb || `${creature.name} is ready.`} What do you need?</p>)}
         {quests.map((quest) => <QuestLog key={quest.id} state={state} quest={quest} />)}
+        {renderIf(!!queued, (
+          <div className="party-queued">
+            {queued?.texts.map((text, index) => <div key={index} className="ql-me party-queued-msg selectable">{text}</div>)}
+            <div className="party-queued-note">
+              <span>{queued && queued.texts.length > 1 ? 'Queued: these send' : 'Queued: sends'} when this reply finishes{isClaude ? ' (files need a turn of their own)' : ''}.</span>
+              <button className="btn sm ghost" onClick={() => void window.hq.cancelQueued(creature.id, thread?.id)}>Cancel</button>
+            </div>
+          </div>
+        ))}
         {approvals.map((approval) => <ApprovalCard key={approval.id} state={state} approval={approval} />)}
         <div ref={endRef} />
       </div>

@@ -143,3 +143,18 @@ export const savePastedFile = (data: ArrayBuffer, type: string): string => {
   writeFileSync(path, Buffer.from(data));
   return path;
 };
+
+const IMAGE_TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
+// The API's per-image limit is 5 MB of base64, about 3.75 MB of file.
+const MAX_INLINE_IMAGE_BYTES = 3_700_000;
+
+// Images that can ride inside a message to a running Claude, like a pasted screenshot.
+// Undefined when any path isn't such an image: that message has to wait for folder access.
+export const inlineImages = (paths: string[]): { mediaType: string; data: string }[] | undefined => {
+  const images = paths.map((path) => {
+    const mediaType = IMAGE_TYPES[extname(path).toLowerCase()];
+    if (!mediaType || !existsSync(path) || statSync(path).size > MAX_INLINE_IMAGE_BYTES) return undefined;
+    return { mediaType, data: readFileSync(path).toString('base64') };
+  });
+  return images.every((image) => image !== undefined) ? (images as { mediaType: string; data: string }[]) : undefined;
+};

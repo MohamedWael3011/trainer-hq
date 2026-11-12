@@ -67,6 +67,15 @@ describe('runClaude', () => {
     expect(handle.send?.('too late')).toBe(false);
   });
 
+  it('sends a screenshot inside the follow-up message', async () => {
+    const { handle } = start({ FAKE_TOOL_MS: '300' });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(handle.send?.('look at this', [{ mediaType: 'image/png', data: 'iVBORw0KGgo=' }])).toBe(true);
+    const outcome = await handle.done;
+    expect(outcome.resultText).toContain('{"type":"text","text":"look at this"}');
+    expect(outcome.resultText).toContain('{"type":"image","source":{"type":"base64","media_type":"image/png","data":"iVBORw0KGgo="}}');
+  });
+
   it('falls back to a plain prompt on a CLI without stream input', async () => {
     const { handle } = start({ FAKE_HELP_FLAGS: '--resume' });
     expect(handle.send?.('second')).toBe(false);

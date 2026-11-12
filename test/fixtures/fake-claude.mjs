@@ -20,7 +20,8 @@ let closed = false;
 const lines = createInterface({ input: process.stdin });
 lines.on('line', (line) => {
   try {
-    received.push(JSON.parse(line).message.content);
+    const content = JSON.parse(line).message.content;
+    received.push(typeof content === 'string' ? content : JSON.stringify(content));
   } catch {
     received.push(line);
   }

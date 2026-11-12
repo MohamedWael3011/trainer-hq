@@ -1,5 +1,8 @@
 import type { QuestEventType, QuestLiveType, QuestUsageType, UsageType } from '@shared/types';
 
+// An image sent inside the message itself, the way pasting a screenshot into Claude Code does.
+export type InlineImageType = { mediaType: string; data: string };
+
 export type RunOutcomeType = {
   ok: boolean;
   resultText: string;
@@ -14,7 +17,7 @@ export type RunHandleType = {
   cancel: () => void;
   done: Promise<RunOutcomeType>;
   // Hand a follow-up message to the running engine. Returns false when it can't take more input.
-  send?: (text: string) => boolean;
+  send?: (text: string, images?: InlineImageType[]) => boolean;
 };
 
 export type RunCallbacksType = {

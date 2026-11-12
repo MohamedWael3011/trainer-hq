@@ -3,7 +3,7 @@ import { createInterface } from 'readline';
 import { EventKind } from '@shared/constants';
 import type { QuestLiveType, QuestUsageType } from '@shared/types';
 import { summarizeToolInput } from '../approvals';
-import type { RunCallbacksType, RunHandleType, RunOutcomeType } from './types';
+import type { InlineImageType, RunCallbacksType, RunHandleType, RunOutcomeType } from './types';
 import { claudeFlagSupport } from './claudeFlags';
 
 const USAGE_LIMIT_PATTERN = /usage limit|rate limit|limit reached|reset at/i;
@@ -33,7 +33,12 @@ const formatK = (tokens: number): string => (tokens >= 1000 ? `${Math.round(toke
 
 // One stream-json user message. The process keeps reading these, so a message sent while Claude is
 // working is picked up mid-task the way the terminal does it, instead of starting a second run.
-const userLine = (text: string): string => `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
+const userLine = (text: string, images: InlineImageType[] = []): string => {
+  const content = images.length === 0
+    ? text
+    : [{ type: 'text', text }, ...images.map((image) => ({ type: 'image', source: { type: 'base64', media_type: image.mediaType, data: image.data } }))];
+  return `${JSON.stringify({ type: 'user', message: { role: 'user', content } })}\n`;
+};
 
 export const runClaude = (options: {
   bin: string;
@@ -275,9 +280,9 @@ export const runClaude = (options: {
       child.kill('SIGTERM');
     },
     done,
-    send: (text: string) => {
+    send: (text: string, images?: InlineImageType[]) => {
       if (!inputOpen || cancelled || timedOut) return false;
-      child.stdin.write(userLine(text));
+      child.stdin.write(userLine(text, images));
       return true;
     },
   };

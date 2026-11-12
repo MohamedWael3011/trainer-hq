@@ -35,7 +35,7 @@ import type {
   UsageType,
 } from '@shared/types';
 import { ApprovalBroker, type AskRequestType } from './approvals';
-import { attachmentDirs, detectPaths, installSkill, prepareAttachments } from './attachments';
+import { attachmentDirs, detectPaths, inlineImages, installSkill, prepareAttachments } from './attachments';
 import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from './auth';
 import { checkForUpdate } from './updates';
 import { limitResetAt } from './limits';
@@ -237,6 +237,11 @@ export class Hq {
       labEnabled: !!this.profile.lab,
       auth: this.auth,
       update: this.update,
+      queued: Array.from(this.chatQueue.values()).filter((requests) => requests.length > 0).map((requests) => ({
+        creatureId: requests[0].creatureId,
+        threadId: requests[0].threadId,
+        texts: requests.map((request) => request.text),
+      })),
       held: Array.from(this.held.values()).map((entry) => ({
         creatureId: entry.creatureId,
         threadId: entry.threadId,
@@ -452,16 +457,19 @@ export class Hq {
     }
     const liveId = this.liveChats.get(sessionKey);
     if (liveId) {
-      const hasFiles = (request.attachments ?? []).length > 0 || detectPaths(request.text).length > 0;
+      const paths = Array.from(new Set([...(request.attachments ?? []), ...detectPaths(request.text)]));
+      // Screenshots and images go inside the message itself, like pasting one into Claude Code.
+      const images = inlineImages(paths);
       const isCommand = request.text.trim().startsWith('/');
       // Like the terminal: a message sent while Claude works is picked up mid-task by the same run.
-      // Files need new folder access and commands need a turn of their own, so those wait instead.
-      if (!hasFiles && !isCommand && this.running.get(liveId)?.send?.(request.text)) {
+      // Other files need new folder access and commands need a turn of their own, so those wait instead.
+      if (images && !isCommand && this.running.get(liveId)?.send?.(request.text, images)) {
         this.quests.addEvent(liveId, { kind: EventKind.USER, text: request.text });
         return liveId;
       }
+      // Shown as a pending bubble under the running reply (see queuedChats in getState).
       this.chatQueue.set(sessionKey, [...(this.chatQueue.get(sessionKey) ?? []), request]);
-      this.quests.addEvent(liveId, { kind: EventKind.SYSTEM, text: `Queued, sends when this reply finishes: ${request.text.replace(/\s+/g, ' ').slice(0, 120)}` });
+      this.emit();
       return liveId;
     }
     const paths = Array.from(new Set([...(request.attachments ?? []), ...detectPaths(request.text)]));
@@ -538,6 +546,11 @@ export class Hq {
   sendHeldNow(creatureId: string, threadId?: string): void {
     this.releaseHeld(threadKey(creatureId, threadId));
     this.scheduleHeld();
+  }
+
+  cancelQueued(creatureId: string, threadId?: string): void {
+    this.chatQueue.delete(threadKey(creatureId, threadId));
+    this.emit();
   }
 
   cancelHeld(creatureId: string, threadId?: string): void {

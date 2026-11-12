@@ -56,6 +56,7 @@ export type HqApiType = {
   compactThread: (creatureId: string, threadId?: string) => Promise<string>;
   openThreadInTerminal: (creatureId: string, threadId?: string) => Promise<void>;
   sendHeldNow: (creatureId: string, threadId?: string) => Promise<void>;
+  cancelQueued: (creatureId: string, threadId?: string) => Promise<void>;
   cancelHeld: (creatureId: string, threadId?: string) => Promise<void>;
   checkUpdate: () => Promise<UpdateInfoType | undefined>;
   installUpdate: () => Promise<void>;

@@ -43,8 +43,13 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
     host.windows().forEach(([, win]) => win.webContents.setBackgroundThrottling(false));
     let pendingQuest: string | undefined;
     if (process.env.THQ_SMOKE_CHAT_NOWAIT) {
-      const [creatureId, ...rest] = process.env.THQ_SMOKE_CHAT_NOWAIT.split(':');
-      pendingQuest = host.chat({ creatureId, text: rest.join(':') });
+      // Several messages separated by "||" go out one after another, e.g. to see what queues behind a running reply.
+      for (const message of process.env.THQ_SMOKE_CHAT_NOWAIT.split('||')) {
+        const [creatureId, ...rest] = message.split(':');
+        pendingQuest ??= host.chat({ creatureId, text: rest.join(':') });
+        if (pendingQuest && message !== process.env.THQ_SMOKE_CHAT_NOWAIT.split('||')[0]) host.chat({ creatureId, text: rest.join(':') });
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
       const started = Date.now();
       // THQ_SMOKE_NOWAIT_MS captures a reply mid-stream instead of waiting for an approval.
       const waitMs = Number(process.env.THQ_SMOKE_NOWAIT_MS) > 0 ? Number(process.env.THQ_SMOKE_NOWAIT_MS) : CHAT_TIMEOUT_MS;

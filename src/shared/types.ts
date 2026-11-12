@@ -205,7 +205,15 @@ export type AppStateType = {
   auth?: AuthStatusType;
   update?: UpdateInfoType;
   held: HeldChatType[];
+  queued: QueuedChatType[];
   errors: string[];
+};
+
+// Messages sent while a creature works that wait for its reply to finish.
+export type QueuedChatType = {
+  creatureId: string;
+  threadId?: string;
+  texts: string[];
 };
 
 // Chat messages waiting for the plan usage limit to reset.
