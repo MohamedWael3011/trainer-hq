@@ -4,7 +4,7 @@ import YAML from 'yaml';
 import type { CreatureType } from '@shared/types';
 import type { ProfileConfigType } from './config';
 import { expandGlob } from './registry';
-import { DaycareMode } from '@shared/constants';
+import { DaycareMode, EngineAdapter } from '@shared/constants';
 import { REMEMBER_HEADING } from './daycare';
 
 // Keep always-on inline memory tight (~900 tokens max): only core identity/workspace notes are inlined,
@@ -152,12 +152,17 @@ export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfig
   const skills = localSkills(creature);
   const teammates = party.filter((entry) => entry.id !== creature.id);
   const roster = teammates.map((entry) => `- ${entry.id} (${entry.name}): ${entry.role}`).join('\n');
+  const usesClaudeCode = (profile.engines[creature.engine] ?? profile.engines.claude)?.adapter === EngineAdapter.CLAUDE;
   const lines = [
     `You are ${creature.name}, a specialist in the user's Trainer HQ party. Your role: ${creature.role}.`,
     creature.blurb,
     extra,
     `Your notes live in ${creature.dir}.`,
-    'Keep the conversation lean: everything you read stays in context and is resent on every step. Find things with Grep/Glob first, Read big files with offset/limit instead of whole, never re-read a file you already have, change code with Edit rather than writing throwaway patch scripts, and keep command output short (head, --stat, -n). For broad searches across many files, or reading long docs, PDFs or logs, hand the reading to a helper agent (the Agent tool, e.g. Explore) and work from its summary: it reads in its own context, so yours stays small.',
+    'Keep the conversation lean: everything you read stays in context and is resent on every step. Find things with Grep/Glob first, Read big files with offset/limit instead of whole, never re-read a file you already have, change code with Edit rather than writing throwaway patch scripts, and keep command output short (head, --stat, -n).',
+    // Helper agents are Claude Code's Agent tool; other engines don't have it.
+    usesClaudeCode
+      ? 'For broad searches across many files, or reading long docs, PDFs or logs, hand the reading to a helper agent (the Agent tool, e.g. Explore) and work from its summary: it reads in its own context, so yours stays small.'
+      : '',
     profile.daycareMode === DaycareMode.FREE
       ? `If this chat taught you something durable and non-obvious about the user's work (a gotcha, contract, decision, file location or convention), end your answer with a line "${REMEMBER_HEADING}" followed by 1-3 short "- " bullets. Leave it out when there's nothing new.`
       : '',

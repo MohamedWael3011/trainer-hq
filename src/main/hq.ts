@@ -377,7 +377,8 @@ export class Hq {
         return;
       }
       if (outcome.usageLimited) {
-        const resumeAt = options.request ? limitResetAt(this.usage, outcome.error) : undefined;
+        // The rate-limit report is about the Claude plan; other engines only say it in their error.
+        const resumeAt = options.request ? limitResetAt(engine.adapter === EngineAdapter.CLAUDE ? this.usage : undefined, outcome.error) : undefined;
         if (options.request && resumeAt) {
           this.hold(sessionKey, options.request, resumeAt, quest.id);
           this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: `Paused: your plan usage limit was reached. This message sends again automatically at ${clockLabel(resumeAt)}.` });
