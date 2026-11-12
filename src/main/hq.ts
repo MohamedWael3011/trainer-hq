@@ -14,6 +14,7 @@ import {
   type QuestKindType,
 } from '@shared/constants';
 import type {
+  CommandInfoType,
   UpdateInfoType,
   QuestLiveType,
   AppStateType,
@@ -39,6 +40,8 @@ import { attachmentDirs, detectPaths, inlineImages, installSkill, prepareAttachm
 import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from './auth';
 import { checkForUpdate } from './updates';
 import { limitResetAt } from './limits';
+import { describeCommands } from './commands';
+import { newOutputs, pathsInText } from './outputs';
 import { claudeFlagSupport, resetFlagSupport } from './engines/claudeFlags';
 import { buildSystemPrompt } from './brain';
 import { addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
@@ -108,6 +111,10 @@ export class Hq {
   private chatQueue = new Map<string, ChatRequestType[]>();
   // Messages that hit the plan usage limit, per session, sent again once the limit resets.
   private held = new Map<string, HeldEntryType>();
+  // What each creature's last Claude run said it can run, for slash-command suggestions.
+  private commandNames = new Map<string, string[]>();
+  // Files creatures produced, which the chat may load (see isOutput). Filled from quest events.
+  private outputs: Set<string> | undefined;
   private heldTimer: NodeJS.Timeout | undefined;
   private usageTimer: NodeJS.Timeout | undefined;
   private stopWatching: (() => void) | undefined;
@@ -151,6 +158,7 @@ export class Hq {
     this.profile = loadProfileConfig(file.profiles[file.active].vault);
     this.quests.load(this.profileId);
     this.threads.load(this.profileId);
+    this.outputs = undefined;
     this.held = new Map(Object.entries(this.quests.loadHeld<HeldEntryType>()));
     this.scheduleHeld();
     this.auth = undefined;
@@ -264,7 +272,9 @@ export class Hq {
   }
 
   private env(): NodeJS.ProcessEnv {
-    const env = { ...process.env, ...this.profile.env };
+    // Headless Claude Code leaves out the Artifact tools unless this is set. Set it to 0 under
+    // env: in profile.yaml to turn them off.
+    const env: NodeJS.ProcessEnv = { CLAUDE_CODE_ARTIFACT: '1', ...process.env, ...this.profile.env };
     delete env.ELECTRON_RUN_AS_NODE;
     if (this.profile.claudeConfigDir) env.CLAUDE_CONFIG_DIR = this.profile.claudeConfigDir;
     return env;
@@ -325,6 +335,18 @@ export class Hq {
       onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : sessionId),
       onQuestUsage: (questUsage: QuestUsageType) => this.quests.setUsage(quest.id, questUsage),
       onLive: (live: QuestLiveType) => this.setLive(quest.id, live),
+      onCommands: (names: string[]) => this.commandNames.set(creature.id, names),
+      onToolOutput: (text: string) => {
+        const paths = pathsInText(text);
+        if (paths.length === 0) return;
+        const shown = new Set((this.quests.get(quest.id)?.events ?? []).filter((event) => event.kind === EventKind.OUTPUT).map((event) => event.text));
+        newOutputs(paths, quest.startedAt, [cwd, this.profile.vault])
+          .filter((path) => !shown.has(path))
+          .forEach((path) => {
+            this.knownOutputs().add(path);
+            this.quests.addEvent(quest.id, { kind: EventKind.OUTPUT, text: path });
+          });
+      },
       onUsage: (usage: UsageType) => {
         this.usage = usage;
         // Refresh the plan ring when the window resets, even if nothing else changes then.
@@ -546,6 +568,23 @@ export class Hq {
   sendHeldNow(creatureId: string, threadId?: string): void {
     this.releaseHeld(threadKey(creatureId, threadId));
     this.scheduleHeld();
+  }
+
+  private knownOutputs(): Set<string> {
+    this.outputs ??= new Set(this.quests.list().flatMap((quest) => quest.events.filter((event) => event.kind === EventKind.OUTPUT).map((event) => event.text)));
+    return this.outputs;
+  }
+
+  // Only files listed as some reply's output are served to the chat, never arbitrary paths.
+  isOutput(path: string): boolean {
+    return this.knownOutputs().has(path);
+  }
+
+  listCommands(creatureId: string): CommandInfoType[] {
+    const creature = this.creature(creatureId);
+    const configDir = this.profile.claudeConfigDir ?? join(homedir(), '.claude');
+    const projectDirs = [creature.cwd, this.profile.vault].filter((dir): dir is string => !!dir);
+    return describeCommands(this.commandNames.get(creatureId), projectDirs, configDir);
   }
 
   cancelQueued(creatureId: string, threadId?: string): void {

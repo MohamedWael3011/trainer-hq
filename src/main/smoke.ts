@@ -85,6 +85,11 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
         await new Promise((resolve) => setTimeout(resolve, Number(interval)));
       }
     }
+    // THQ_SMOKE_JS: run a snippet in the dashboard before the screenshots (e.g. type into the composer).
+    if (process.env.THQ_SMOKE_JS) {
+      await host.windows().find(([name]) => name === 'dashboard')?.[1].webContents.executeJavaScript(process.env.THQ_SMOKE_JS);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
     if (process.env.THQ_SMOKE_NOTCH_OPEN) {
       host.openNotch();
       await new Promise((resolve) => setTimeout(resolve, 800));

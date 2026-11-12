@@ -10,6 +10,7 @@ import ThreadSheet from '../ThreadSheet/ThreadSheet';
 import CreatureControls from '../../components/CreatureControls/CreatureControls';
 import { renderIf } from '../../lib/renderIf';
 import { useQuestLive } from '../../hooks/useQuestLive';
+import { useCommands } from '../../hooks/useCommands';
 import { AUTONOMY_INFO, creatureById, isLive } from '../../lib/format';
 import './styles.css';
 
@@ -24,6 +25,8 @@ const COMPOSER_MAX_HEIGHT = 200;
 const PINNED_SLACK_PX = 80;
 // From here on the chat shows how close the 5-hour plan window is to its limit.
 const PLAN_WARN_AT = 0.8;
+const SLASH_LIMIT = 8;
+const SLASH_QUERY = /^\/([\w:.-]*)$/;
 // Past this size every step resends a lot; suggest compacting before auto-compact has to.
 const SUGGEST_COMPACT_TOKENS = 70_000;
 const DISMISSED_COMPACT_KEY = 'thq.compactHintDismissed';
@@ -211,11 +214,49 @@ const Party = ({ state, creatureId }: PropsType) => {
   }, [draft, creature, threadId]);
 
   // Enter sends, Shift+Enter adds a line. Skip while an IME is composing (e.g. Arabic or Japanese input).
+  // Typing "/" lists the commands and skills this creature can run, with what each one does.
+  const finishedRuns = state.quests.filter((quest) => quest.creatureId === creatureId && !isLive(quest)).length;
+  const commands = useCommands(isClaude ? creatureId : undefined, finishedRuns);
+  const [slashIndex, setSlashIndex] = useState(0);
+  const [slashDismissed, setSlashDismissed] = useState('');
+  const slashQuery = draft.match(SLASH_QUERY)?.[1]?.toLowerCase();
+  const slashMatches = useMemo(() => {
+    if (slashQuery === undefined || draft === slashDismissed) return [];
+    // Plain names before plugin ones (plugin:skill), shorter before longer: "/c" offers compact before champion-kit:faq.
+    const rank = (name: string): number => (name.includes(':') ? 1000 : 0) + name.length;
+    const starts = commands.filter((entry) => entry.name.toLowerCase().startsWith(slashQuery)).sort((a, b) => rank(a.name) - rank(b.name));
+    const contains = commands.filter((entry) => !entry.name.toLowerCase().startsWith(slashQuery) && `${entry.name} ${entry.description}`.toLowerCase().includes(slashQuery));
+    return [...starts, ...contains].slice(0, SLASH_LIMIT);
+  }, [commands, slashQuery, draft, slashDismissed]);
+  useEffect(() => setSlashIndex(0), [slashQuery]);
+  const pickSlash = useCallback((name: string) => {
+    setDraft(`/${name} `);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
   const onComposerKey = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slashMatches.length > 0) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        setSlashIndex((index) => (index + step + slashMatches.length) % slashMatches.length);
+        return;
+      }
+      if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing)) {
+        event.preventDefault();
+        pickSlash(slashMatches[Math.min(slashIndex, slashMatches.length - 1)].name);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setSlashDismissed(draft);
+        return;
+      }
+    }
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
     send();
-  }, [send]);
+  }, [send, slashMatches, slashIndex, pickSlash, draft]);
 
   if (!creature) return <div className="party-empty">Hatch your first creature to start.</div>;
   const autonomy = AUTONOMY_INFO[creature.autonomy];
@@ -354,6 +395,25 @@ const Party = ({ state, creatureId }: PropsType) => {
         </div>
       ))}
       <form className="party-composer" onSubmit={send}>
+      {renderIf(slashMatches.length > 0, (
+        <div className="party-slash" role="listbox" aria-label="Commands and skills">
+          {slashMatches.map((entry, index) => (
+            <button
+              key={entry.name}
+              role="option"
+              aria-selected={index === slashIndex}
+              className="party-slash-item"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => pickSlash(entry.name)}
+            >
+              <span className="party-slash-name">/{entry.name}</span>
+              <span className="party-slash-kind">{entry.kind === 'builtin' ? 'Claude Code' : entry.kind}</span>
+              <span className="party-slash-desc">{entry.description || 'No description'}</span>
+            </button>
+          ))}
+          <span className="party-slash-hint">↑↓ choose · Tab or Enter to pick · Esc to close</span>
+        </div>
+      ))}
         <label className="party-attach" title="Attach files">
           +
           <input type="file" multiple onChange={onPick} />

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { Ipc, type AutonomyType, type SurfaceType } from '@shared/constants';
 import type { HqApiType } from '@shared/api';
 import type {
+  CommandInfoType,
   AppStateType,
   QuestLiveType,
   UpdateInfoType,
@@ -36,6 +37,7 @@ const api: HqApiType = {
   onFocusCreature: (callback: (creatureId: string) => void) => subscribe(Ipc.FOCUS_CREATURE, callback),
   onDockToggle: (callback: () => void) => subscribe(Ipc.DOCK_TOGGLE, callback),
   onDockExpand: (callback: () => void) => subscribe(Ipc.DOCK_EXPAND, callback),
+  onDisplaysChanged: (callback: () => void) => subscribe(Ipc.DISPLAYS_CHANGED, callback),
   setDockHidden: (hidden: boolean): Promise<void> => ipcRenderer.invoke(Ipc.DOCK_SET_HIDDEN, hidden),
   resizeDock: (size: DockSizeType, persist: boolean): Promise<DockSizeType> => ipcRenderer.invoke(Ipc.DOCK_RESIZE, size, persist),
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
@@ -64,6 +66,7 @@ const api: HqApiType = {
   compactThread: (creatureId: string, threadId?: string): Promise<string> => ipcRenderer.invoke(Ipc.THREAD_COMPACT, creatureId, threadId),
   openThreadInTerminal: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_TERMINAL, creatureId, threadId),
   sendHeldNow: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_HELD_SEND, creatureId, threadId),
+  listCommands: (creatureId: string): Promise<CommandInfoType[]> => ipcRenderer.invoke(Ipc.COMMANDS_LIST, creatureId),
   cancelQueued: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_QUEUED_CANCEL, creatureId, threadId),
   cancelHeld: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_HELD_CANCEL, creatureId, threadId),
   checkUpdate: (): Promise<UpdateInfoType | undefined> => ipcRenderer.invoke(Ipc.UPDATE_CHECK),

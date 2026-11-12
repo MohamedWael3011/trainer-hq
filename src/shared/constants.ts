@@ -65,6 +65,8 @@ export const EventKind = {
   RESULT: 'result',
   ERROR: 'error',
   SYSTEM: 'system',
+  // A file the creature produced during the reply (its absolute path is the event text).
+  OUTPUT: 'output',
 } as const;
 export type EventKindType = (typeof EventKind)[keyof typeof EventKind];
 
@@ -137,6 +139,8 @@ export type LabSchemeType = (typeof LabScheme)[keyof typeof LabScheme];
 
 export const LAB_DEVICE_SETS = ['phones', 'ios', 'android', 'samsung', 'duo', 'foldables', 'mobile'];
 export const LAB_PROTOCOL = 'thq-lab';
+// Serves files creatures produced (see Hq.isOutput) to the chat log.
+export const OUTPUT_PROTOCOL = 'thq-output';
 
 export const Ipc = {
   STATE_GET: 'state:get',
@@ -166,6 +170,7 @@ export const Ipc = {
   THREAD_HELD_SEND: 'thread:held-send',
   THREAD_HELD_CANCEL: 'thread:held-cancel',
   THREAD_QUEUED_CANCEL: 'thread:queued-cancel',
+  COMMANDS_LIST: 'commands:list',
   UPDATE_CHECK: 'update:check',
   UPDATE_INSTALL: 'update:install',
   LAB_STATE: 'lab:state',
@@ -192,6 +197,7 @@ export const Ipc = {
   OPEN_LOCAL: 'shell:open-local',
   LOGIN_ITEM_GET: 'app:login-item-get',
   NOTCH_METRICS: 'notch:metrics',
+  DISPLAYS_CHANGED: 'displays:changed',
   DOCK_TOGGLE: 'dock:toggle',
   DOCK_EXPAND: 'dock:expand',
   DOCK_SET_HIDDEN: 'dock:set-hidden',

@@ -44,6 +44,10 @@ export const summarizeToolInput = (toolName: string, input: unknown): string => 
   if ((toolName === 'Agent' || toolName === 'Task') && typeof data.description === 'string') {
     return `Helper agent: ${data.description}`.slice(0, SUMMARY_LIMIT);
   }
+  if (toolName === 'Bash' && data.run_in_background === true && typeof data.command === 'string') {
+    return `Bash (background) ${data.command}`.slice(0, SUMMARY_LIMIT);
+  }
+  if (toolName === 'BashOutput' || toolName === 'TaskOutput') return 'Checked on the background task';
   if (toolName === 'TodoWrite' && Array.isArray(data.todos)) return `Updated the plan (${data.todos.length} steps)`;
   const pick = data.command ?? data.file_path ?? data.path ?? data.pattern ?? data.url ?? data.query ?? data.skill;
   const text = typeof pick === 'string' ? pick : JSON.stringify(data);

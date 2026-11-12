@@ -69,14 +69,19 @@ const Notch = ({ state }: PropsType) => {
   const peekCreature = live[0]?.creatureId ?? defaultCreature;
 
   useEffect(() => {
-    void window.hq.getNotchMetrics().then((metrics) => {
-      const root = document.documentElement.style;
-      root.setProperty('--bar-h', `${metrics.barHeight}px`);
-      root.setProperty('--pill-w', `${metrics.pillWidth}px`);
-      root.setProperty('--notch-w', `${metrics.notchWidth}px`);
-      root.setProperty('--pill-inset', `${(metrics.panelWidth - metrics.pillWidth) / 2}px`);
-      setHardware(metrics.hasNotch);
-    });
+    // Again whenever displays change: an external monitor has no notch and a different menu bar.
+    const measure = (): void => {
+      void window.hq.getNotchMetrics().then((metrics) => {
+        const root = document.documentElement.style;
+        root.setProperty('--bar-h', `${metrics.barHeight}px`);
+        root.setProperty('--pill-w', `${metrics.pillWidth}px`);
+        root.setProperty('--notch-w', `${metrics.notchWidth}px`);
+        root.setProperty('--pill-inset', `${(metrics.panelWidth - metrics.pillWidth) / 2}px`);
+        setHardware(metrics.hasNotch);
+      });
+    };
+    measure();
+    return window.hq.onDisplaysChanged(measure);
   }, []);
 
   useEffect(() => {

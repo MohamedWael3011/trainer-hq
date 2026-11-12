@@ -1,6 +1,6 @@
 import { join } from 'path';
 import { app, dialog, globalShortcut, ipcMain, net, protocol, shell } from 'electron';
-import { DOCK_SHORTCUT, Ipc, LAB_PROTOCOL, NOTCH_SHORTCUT, SPRITE_PROTOCOL, type AutonomyType, type SurfaceType } from '@shared/constants';
+import { DOCK_SHORTCUT, Ipc, LAB_PROTOCOL, OUTPUT_PROTOCOL, NOTCH_SHORTCUT, SPRITE_PROTOCOL, type AutonomyType, type SurfaceType } from '@shared/constants';
 import type { ApprovalDecisionType, ChatRequestType, DaycareDecisionType, DockSizeType, HatchRequestType, LabShootRequestType, ProfileCreateRequestType, ProfileSettingsType, SkillInstallRequestType, ThreadCreateRequestType } from '@shared/types';
 import { expandHome } from './paths';
 import { pathToFileURL } from 'url';
@@ -17,6 +17,7 @@ import { Windows } from './windows';
 protocol.registerSchemesAsPrivileged([
   { scheme: SPRITE_PROTOCOL, privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true } },
   { scheme: LAB_PROTOCOL, privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true } },
+  { scheme: OUTPUT_PROTOCOL, privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true } },
 ]);
 
 if (!process.env.THQ_SMOKE_DIR && !app.requestSingleInstanceLock()) app.quit();
@@ -69,6 +70,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.UPDATE_INSTALL, () => hq.installUpdate());
   ipcMain.handle(Ipc.THREAD_TERMINAL, (_event, creatureId: string, threadId?: string) => hq.openThreadInTerminal(creatureId, threadId));
   ipcMain.handle(Ipc.THREAD_HELD_SEND, (_event, creatureId: string, threadId?: string) => hq.sendHeldNow(creatureId, threadId));
+  ipcMain.handle(Ipc.COMMANDS_LIST, (_event, creatureId: string) => hq.listCommands(creatureId));
   ipcMain.handle(Ipc.THREAD_QUEUED_CANCEL, (_event, creatureId: string, threadId?: string) => hq.cancelQueued(creatureId, threadId));
   ipcMain.handle(Ipc.THREAD_HELD_CANCEL, (_event, creatureId: string, threadId?: string) => hq.cancelHeld(creatureId, threadId));
   ipcMain.handle(Ipc.AUTH_LOGIN, () => hq.openLogin());
@@ -107,6 +109,11 @@ app.whenReady().then(async () => {
   protocol.handle(LAB_PROTOCOL, (request) => {
     const file = hq.lab.resolveShot(decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, '')));
     return file ? net.fetch(pathToFileURL(file).toString()) : new Response('Not found', { status: 404 });
+  });
+  protocol.handle(OUTPUT_PROTOCOL, (request) => {
+    // thq-output://f/Users/me/shots/home.png: the path is the URL path.
+    const file = decodeURIComponent(new URL(request.url).pathname);
+    return hq.isOutput(file) ? net.fetch(pathToFileURL(file).toString()) : new Response('Not found', { status: 404 });
   });
   hq.onLab(() => windows.dashboard?.webContents.send(Ipc.LAB_STATE));
   registerIpc();

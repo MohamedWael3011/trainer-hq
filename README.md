@@ -61,6 +61,9 @@ A short onboarding checks your tools, sets up your vault and repos, and introduc
 | **Handoffs** | `ask_creature`: creatures call teammates and get answers back, with chain limits and timeouts. |
 | **Autonomy + guard** | Ask / auto-edit / full auto. Full auto keeps a deny list, a time limit and worktrees, and pauses near your plan's usage limit. |
 | **Tiered brain + Day Care** | Core rules (`01-workspace.md`, `how-i-work.md`, or `tier: hot`) stay inline; deeper domain notes and `## Learned` history are indexed with section line ranges and pulled on demand. Day Care proposes new notes for free at the end of each chat. |
+| **Slash commands & skills** | Type `/` in a chat to see the commands and skills that creature can run, with what each one does. A command you send shows its description, and a skill a creature runs shows as its own card. |
+| **Files a creature makes** | Renders, screenshots, HTML pages and PDFs a creature creates during a reply (named in its tool output or written by it, such as a render harness's `shots-*` folder) show as a card under the reply: thumbnails, where they were saved, **Open folder**, and a full-size preview. Background commands show as their own card. |
+| **Artifacts** | Claude creatures can publish claude.ai Artifacts (`Artifact`, `ArtifactData`, `ArtifactComments`), which headless Claude Code leaves out by default. Set `CLAUDE_CODE_ARTIFACT: "0"` under `env:` in `profile.yaml` to turn this off. |
 | **Engines, models & cost** | Claude Code and Antigravity (`agy`) with model & effort pickers, plan-use labels, and per-reply token/cache/cost badges under every quest; any other CLI agent plugs in through a generic adapter. |
 | **Attachments** | Drop or paste files: their paths go into the message, zips are unpacked, and skill zips install in one click. |
 | **Profiles** | One vault per profile (work, personal…), each optionally with its own Claude account. |

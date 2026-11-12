@@ -42,3 +42,13 @@
 
 .party-jump { position: sticky; bottom: 4px; justify-self: center; z-index: 2; height: 28px; padding: 0 12px; border-radius: 14px; font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent); box-shadow: var(--shadow); transition: transform 160ms var(--ease-out); }
 .party-jump:active { transform: scale(0.96); }
+
+.party-composer { position: relative; }
+.party-slash { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 5; display: grid; gap: 2px; padding: 6px; max-height: 320px; overflow-y: auto; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shadow); }
+.party-slash-item { display: grid; grid-template-columns: auto auto 1fr; align-items: baseline; gap: 10px; padding: 7px 10px; border-radius: 8px; text-align: left; font-size: 12px; }
+.party-slash-item[aria-selected='true'] { background: var(--accent-soft); }
+@media (hover: hover) and (pointer: fine) { .party-slash-item:hover { background: var(--surface-3); } }
+.party-slash-name { font-weight: 700; color: var(--fg); }
+.party-slash-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-3); }
+.party-slash-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
+.party-slash-hint { padding: 4px 10px 2px; font-size: 10px; color: var(--fg-3); }

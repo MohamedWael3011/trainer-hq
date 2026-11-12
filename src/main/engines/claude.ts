@@ -116,6 +116,11 @@ export const runClaude = (options: {
     }
     if (message.type === StreamType.SYSTEM && message.subtype === SubtypeInit && message.session_id) {
       callbacks.onSession?.(message.session_id);
+      if (Array.isArray(message.slash_commands)) {
+        // Terminal-only commands (and internal ones) do nothing in a creature chat.
+        const terminalOnly = new Set<string>(Array.isArray(message.terminal_slash_commands) ? message.terminal_slash_commands : []);
+        callbacks.onCommands?.((message.slash_commands as string[]).filter((name) => !terminalOnly.has(name) && !name.startsWith('__')));
+      }
       return;
     }
     const fromHelper = !!message.parent_tool_use_id;
@@ -161,6 +166,14 @@ export const runClaude = (options: {
         agents.delete(String(message.task_id));
         pushLive({});
       }
+    }
+    if (message.type === StreamType.USER && callbacks.onToolOutput) {
+      const parts = (Array.isArray(message.message?.content) ? message.message.content : []) as Record<string, any>[];
+      const text = parts
+        .filter((part) => part.type === 'tool_result')
+        .flatMap((part) => (typeof part.content === 'string' ? [part.content] : Array.isArray(part.content) ? part.content.map((item: Record<string, any>) => (typeof item.text === 'string' ? item.text : '')) : []))
+        .join('\n');
+      if (text) callbacks.onToolOutput(text);
     }
     if (message.type === StreamType.USER && !fromHelper) {
       // A tool result came back; Claude is about to think about it.

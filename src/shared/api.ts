@@ -1,5 +1,6 @@
 import type { AutonomyType, SurfaceType } from './constants';
 import type {
+  CommandInfoType,
   AppStateType,
   QuestLiveType,
   UpdateInfoType,
@@ -28,6 +29,7 @@ export type HqApiType = {
   onFocusCreature: (callback: (creatureId: string) => void) => () => void;
   onDockToggle: (callback: () => void) => () => void;
   onDockExpand: (callback: () => void) => () => void;
+  onDisplaysChanged: (callback: () => void) => () => void;
   setDockHidden: (hidden: boolean) => Promise<void>;
   resizeDock: (size: DockSizeType, persist: boolean) => Promise<DockSizeType>;
   pathForFile: (file: File) => string;
@@ -56,6 +58,7 @@ export type HqApiType = {
   compactThread: (creatureId: string, threadId?: string) => Promise<string>;
   openThreadInTerminal: (creatureId: string, threadId?: string) => Promise<void>;
   sendHeldNow: (creatureId: string, threadId?: string) => Promise<void>;
+  listCommands: (creatureId: string) => Promise<CommandInfoType[]>;
   cancelQueued: (creatureId: string, threadId?: string) => Promise<void>;
   cancelHeld: (creatureId: string, threadId?: string) => Promise<void>;
   checkUpdate: () => Promise<UpdateInfoType | undefined>;

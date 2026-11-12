@@ -26,4 +26,8 @@ export type RunCallbacksType = {
   onUsage?: (usage: UsageType) => void;
   onQuestUsage?: (usage: QuestUsageType) => void;
   onLive?: (live: QuestLiveType) => void;
+  // The slash commands and skills this run can use, from Claude Code's init message.
+  onCommands?: (names: string[]) => void;
+  // Text a tool returned (its own or a helper's), scanned for files the run produced.
+  onToolOutput?: (text: string) => void;
 };

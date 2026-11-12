@@ -3,6 +3,8 @@ import { BrowserWindow, screen } from 'electron';
 import { Ipc, MAX_DOCK_HEIGHT, MIN_DOCK_SIZE, Surface, type SurfaceType } from '@shared/constants';
 import type { DockSizeType, NotchMetricsType } from '@shared/types';
 
+// Displays report several changes while a monitor connects; wait for them to settle.
+const DISPLAY_SETTLE_MS = 400;
 const NOTCH_SIZE = { width: 520, height: 520 };
 const HARDWARE_NOTCH_MIN_BAR = 32;
 const HARDWARE_NOTCH_WIDTH = 200;
@@ -50,6 +52,8 @@ export class Windows {
   private lastOverlayAt = 0;
   private interactive = new Set<SurfaceType>();
   private dockWanted = true;
+  private dockSize: DockSizeType = MIN_DOCK_SIZE;
+  private placeTimer: NodeJS.Timeout | undefined;
   private fullscreen = false;
 
   // Clicking or typing in the notch or dock can activate the app, which macOS reports as a
@@ -80,13 +84,38 @@ export class Windows {
   }
 
   resizeDock(size: DockSizeType): DockSizeType {
+    this.dockSize = size;
     const bounds = this.dockBounds(size);
     this.dock.setBounds(bounds);
     return { width: bounds.width, height: bounds.height };
   }
 
+  // The notch sits at the top centre of the main display (the one with the menu bar).
+  private notchBounds(): Electron.Rectangle {
+    const bounds = screen.getPrimaryDisplay().bounds;
+    return {
+      x: Math.round(bounds.x + (bounds.width - NOTCH_SIZE.width) / 2),
+      y: bounds.y,
+      ...NOTCH_SIZE,
+    };
+  }
+
+  // Plugging in a monitor, unplugging it, or changing which display is main moves the menu bar.
+  // Move the notch and dock with it, and let the notch redraw for a display with or without a notch.
+  private replace(): void {
+    if (this.placeTimer) clearTimeout(this.placeTimer);
+    this.placeTimer = setTimeout(() => {
+      this.placeTimer = undefined;
+      if (!this.notch.isDestroyed()) {
+        this.notch.setBounds(this.notchBounds());
+        this.notch.webContents.send(Ipc.DISPLAYS_CHANGED);
+      }
+      if (!this.dock.isDestroyed()) this.dock.setBounds(this.dockBounds(this.dockSize));
+    }, DISPLAY_SETTLE_MS);
+  }
+
   create(dockHidden: boolean, dockSize: DockSizeType): void {
-    const display = screen.getPrimaryDisplay();
+    this.dockSize = dockSize;
     this.dock = overlay(this.dockBounds(dockSize), true);
     this.dock.setAlwaysOnTop(true, FLOATING_LEVEL);
     this.dock.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
@@ -98,12 +127,7 @@ export class Windows {
       if (this.dockWanted && !this.fullscreen) this.dock.showInactive();
     });
 
-    const bounds = display.bounds;
-    const notchBounds = {
-      x: Math.round(bounds.x + (bounds.width - NOTCH_SIZE.width) / 2),
-      y: bounds.y,
-      ...NOTCH_SIZE,
-    };
+    const notchBounds = this.notchBounds();
     this.notch = overlay(notchBounds, true, true);
     this.notch.setBounds(notchBounds);
     this.notch.setAlwaysOnTop(true, OVERLAY_LEVEL);
@@ -114,6 +138,10 @@ export class Windows {
     this.notch.once('ready-to-show', () => {
       if (!this.fullscreen) this.notch.showInactive();
     });
+    const replace = (): void => this.replace();
+    screen.on('display-added', replace);
+    screen.on('display-removed', replace);
+    screen.on('display-metrics-changed', replace);
   }
 
   notchMetrics(): NotchMetricsType {

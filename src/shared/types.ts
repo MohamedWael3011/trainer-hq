@@ -209,6 +209,13 @@ export type AppStateType = {
   errors: string[];
 };
 
+// A slash command or skill a creature can run, for the composer's suggestions and the chat log.
+export type CommandInfoType = {
+  name: string;
+  description: string;
+  kind: 'skill' | 'command' | 'builtin';
+};
+
 // Messages sent while a creature works that wait for its reply to finish.
 export type QueuedChatType = {
   creatureId: string;

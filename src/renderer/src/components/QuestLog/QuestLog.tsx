@@ -6,7 +6,9 @@ import Badge from '../Badge/Badge';
 import Markdown from '../Markdown/Markdown';
 import HandoffCard from '../HandoffCard/HandoffCard';
 import LiveStatus from '../LiveStatus/LiveStatus';
+import OutputFiles from '../OutputFiles/OutputFiles';
 import { useQuestLive } from '../../hooks/useQuestLive';
+import { firstSentence, parseCommand, useCommands } from '../../hooks/useCommands';
 import { renderIf } from '../../lib/renderIf';
 import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, questUsageSummary } from '../../lib/format';
 import './styles.css';
@@ -22,6 +24,10 @@ const visibleEvents = (events: QuestEventType[]): QuestEventType[] => {
 };
 
 const ASK_PREFIX = 'ask ';
+// How a skill run is logged (see summarizeToolInput in approvals.ts).
+const SKILL_EVENT = /^Skill (\S+)\s*([\s\S]*)$/;
+// How a background command is logged (see summarizeToolInput in approvals.ts).
+const BACKGROUND_PREFIX = 'Bash (background) ';
 // Tool calls a helper agent makes are logged with this prefix (see engines/claude.ts).
 const HELPER_PREFIX = '↳ ';
 // How starting a helper is logged (see summarizeToolInput in approvals.ts).
@@ -63,6 +69,8 @@ const QuestLog = ({ state, quest }: PropsType) => {
   const usage = questUsageSummary(quest);
   const running = isLive(quest);
   const live = useQuestLive(running ? quest.id : undefined);
+  const commands = useCommands(quest.creatureId, state.quests.filter((entry) => entry.creatureId === quest.creatureId && !isLive(entry)).length);
+  const describe = (name: string): string => commands.find((entry) => entry.name === name)?.description ?? '';
   let childIndex = 0;
   return (
   <div className="ql">
@@ -70,7 +78,36 @@ const QuestLog = ({ state, quest }: PropsType) => {
     {groupHelperSteps(visibleEvents(quest.events)).map((item) => {
       if (item.kind === 'helper') return <HelperSteps key={item.index} task={item.task} steps={item.steps} />;
       const { event, index } = item;
-      if (event.kind === EventKind.USER) return <div key={index} className="ql-me selectable">{event.text}</div>;
+      if (event.kind === EventKind.USER) {
+        const command = parseCommand(event.text);
+        if (!command) return <div key={index} className="ql-me selectable">{event.text}</div>;
+        return (
+          <div key={index} className="ql-me ql-command selectable" title={describe(command.name) || undefined}>
+            <span><b>/{command.name}</b>{command.args ? ` ${command.args}` : ''}</span>
+            {renderIf(!!describe(command.name), <span className="ql-command-desc">{firstSentence(describe(command.name))}</span>)}
+          </div>
+        );
+      }
+      // Files show together in one card after the reply's steps.
+      if (event.kind === EventKind.OUTPUT) return null;
+      if (event.kind === EventKind.TOOL && event.text.startsWith(BACKGROUND_PREFIX)) {
+        return (
+          <div key={index} className="ql-bg">
+            <span className="ql-bg-title">Running in the background</span>
+            <span className="ql-bg-cmd selectable">{event.text.slice(BACKGROUND_PREFIX.length)}</span>
+            <span className="ql-bg-note">{creatureName(state, quest.creatureId)} gets the result when it finishes. Files it makes show up below.</span>
+          </div>
+        );
+      }
+      const skill = event.kind === EventKind.TOOL ? event.text.match(SKILL_EVENT) : null;
+      if (skill) {
+        return (
+          <div key={index} className="ql-skill" title={describe(skill[1])}>
+            <span className="ql-skill-name">Skill · {skill[1]}</span>
+            <span className="ql-skill-desc">{firstSentence(describe(skill[1])) || skill[2] || 'Loaded its instructions and is following them.'}</span>
+          </div>
+        );
+      }
       if (event.kind === EventKind.TOOL && event.text.startsWith(ASK_PREFIX)) {
         const child = children[childIndex];
         childIndex += 1;
@@ -86,6 +123,7 @@ const QuestLog = ({ state, quest }: PropsType) => {
         </div>
       );
     })}
+    <OutputFiles paths={quest.events.filter((event) => event.kind === EventKind.OUTPUT).map((event) => event.text)} />
     {renderIf(running && !!live?.draft, (
       <div className="ql-bot ql-draft">
         <Sprite state={state} id={quest.creatureId} className="ql-avatar" />
