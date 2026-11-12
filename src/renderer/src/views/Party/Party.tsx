@@ -20,6 +20,8 @@ type PropsType = {
 
 const HISTORY = 12;
 const COMPOSER_MAX_HEIGHT = 200;
+// How close to the bottom still counts as "at the bottom" for following new activity.
+const PINNED_SLACK_PX = 80;
 // From here on the chat shows how close the 5-hour plan window is to its limit.
 const PLAN_WARN_AT = 0.8;
 // Past this size every step resends a lot; suggest compacting before auto-compact has to.
@@ -173,15 +175,37 @@ const Party = ({ state, creatureId }: PropsType) => {
   const draftLines = lastLive?.draft.split('\n').length ?? 0;
   const draftChunks = Math.floor((lastLive?.draft.length ?? 0) / 160);
 
-  useEffect(() => {
+  // Follow new activity only while the reader is at the bottom; scrolling up to read stays put.
+  const logRef = useRef<HTMLDivElement>(null);
+  const pinnedRef = useRef(true);
+  const [behind, setBehind] = useState(false);
+  const jumpToLatest = useCallback(() => {
+    pinnedRef.current = true;
+    setBehind(false);
     endRef.current?.scrollIntoView({ block: 'end' });
-  }, [creatureId, quests.length, lastEventCount, approvals.length, draftLines, draftChunks]);
+  }, []);
+  const onLogScroll = useCallback(() => {
+    const log = logRef.current;
+    if (!log) return;
+    pinnedRef.current = log.scrollHeight - log.scrollTop - log.clientHeight < PINNED_SLACK_PX;
+    if (pinnedRef.current) setBehind(false);
+  }, []);
+
+  // Opening another chat starts at its latest message.
+  useEffect(jumpToLatest, [creatureId, threadId, jumpToLatest]);
+
+  useEffect(() => {
+    if (pinnedRef.current) endRef.current?.scrollIntoView({ block: 'end' });
+    else setBehind(true);
+  }, [quests.length, lastEventCount, approvals.length, draftLines, draftChunks]);
 
   const send = useCallback((event?: FormEvent) => {
     event?.preventDefault();
     const text = draft.trim();
     if (!text || !creature) return;
     void window.hq.chat({ creatureId: creature.id, text, threadId });
+    // Your own message always brings you back to the bottom.
+    pinnedRef.current = true;
     setDraft('');
     setAttachments([]);
   }, [draft, creature, threadId]);
@@ -281,7 +305,7 @@ const Party = ({ state, creatureId }: PropsType) => {
           </div>
         ) : null)}
       </div>
-      <div className="party-log">
+      <div className="party-log" ref={logRef} onScroll={onLogScroll}>
         {renderIf(quests.length === 0, <p className="party-hello muted">{creature.blurb || `${creature.name} is ready.`} What do you need?</p>)}
         {quests.map((quest) => <QuestLog key={quest.id} state={state} quest={quest} />)}
         {renderIf(!!queued, (
@@ -295,6 +319,7 @@ const Party = ({ state, creatureId }: PropsType) => {
         ))}
         {approvals.map((approval) => <ApprovalCard key={approval.id} state={state} approval={approval} />)}
         <div ref={endRef} />
+        {renderIf(behind, <button className="party-jump" onClick={jumpToLatest}>↓ Jump to latest</button>)}
       </div>
       {renderIf(attachments.length > 0, (
         <div className="party-attachments">

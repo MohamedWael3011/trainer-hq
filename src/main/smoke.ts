@@ -49,6 +49,11 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
         pendingQuest ??= host.chat({ creatureId, text: rest.join(':') });
         if (pendingQuest && message !== process.env.THQ_SMOKE_CHAT_NOWAIT.split('||')[0]) host.chat({ creatureId, text: rest.join(':') });
         await new Promise((resolve) => setTimeout(resolve, 700));
+        // THQ_SMOKE_SCROLL_TOP: scroll the chat up after the first message, as if reading back.
+        if (process.env.THQ_SMOKE_SCROLL_TOP && message === process.env.THQ_SMOKE_CHAT_NOWAIT.split('||')[0]) {
+          await host.windows().find(([name]) => name === 'dashboard')?.[1].webContents.executeJavaScript("(() => { const log = document.querySelector('.party-log'); log?.scrollTo(0, 0); return JSON.stringify([log?.scrollTop, log?.scrollHeight, log?.clientHeight]); })()").then((info) => process.stdout.write(`scroll ${info}\n`));
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
       }
       const started = Date.now();
       // THQ_SMOKE_NOWAIT_MS captures a reply mid-stream instead of waiting for an approval.
@@ -56,6 +61,10 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
       while (Date.now() - started < waitMs && host.state().approvals.length === 0) {
         await new Promise((resolve) => setTimeout(resolve, POLL_MS));
       }
+    }
+    if (process.env.THQ_SMOKE_SCROLL_TOP) {
+      const info = await host.windows().find(([name]) => name === 'dashboard')?.[1].webContents.executeJavaScript("(() => { const log = document.querySelector('.party-log'); return JSON.stringify([log?.scrollTop, log?.scrollHeight, log?.clientHeight, !!document.querySelector('.party-jump')]); })()");
+      process.stdout.write(`scroll-after ${info}\n`);
     }
     const chat = process.env.THQ_SMOKE_CHAT ? await runChat(host, process.env.THQ_SMOKE_CHAT) : undefined;
     if (chat) await new Promise((resolve) => setTimeout(resolve, 1500));

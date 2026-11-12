@@ -39,3 +39,6 @@
 .party-queued { display: grid; gap: 6px; }
 .party-queued-msg { opacity: 0.6; border: 1.5px dashed color-mix(in srgb, var(--accent-ink) 55%, transparent); }
 .party-queued-note { justify-self: end; display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--fg-3); }
+
+.party-jump { position: sticky; bottom: 4px; justify-self: center; z-index: 2; height: 28px; padding: 0 12px; border-radius: 14px; font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent); box-shadow: var(--shadow); transition: transform 160ms var(--ease-out); }
+.party-jump:active { transform: scale(0.96); }
