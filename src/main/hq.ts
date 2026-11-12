@@ -82,6 +82,8 @@ const UPDATE_CHECK_MS = 3 * 60 * 60_000;
 const UPDATE_FIRST_CHECK_MS = 20_000;
 // Wait a little past the stated reset so the first retry doesn't land a moment too early.
 const RESET_GRACE_MS = 60_000;
+// setTimeout overflows past ~24.8 days.
+const MAX_TIMER_MS = 2_147_483_647;
 const AUTH_ERROR_PATTERN = /\/login|not logged in|unauthori[sz]ed|invalid api key|authentication|401/i;
 
 export class Hq {
@@ -107,6 +109,7 @@ export class Hq {
   // Messages that hit the plan usage limit, per session, sent again once the limit resets.
   private held = new Map<string, HeldEntryType>();
   private heldTimer: NodeJS.Timeout | undefined;
+  private usageTimer: NodeJS.Timeout | undefined;
   private stopWatching: (() => void) | undefined;
   private emitTimer: NodeJS.Timeout | undefined;
   private listeners = new Set<(state: AppStateType) => void>();
@@ -148,6 +151,8 @@ export class Hq {
     this.profile = loadProfileConfig(file.profiles[file.active].vault);
     this.quests.load(this.profileId);
     this.threads.load(this.profileId);
+    this.held = new Map(Object.entries(this.quests.loadHeld<HeldEntryType>()));
+    this.scheduleHeld();
     this.auth = undefined;
     this.reloadVault();
     void this.refreshAuth();
@@ -227,7 +232,7 @@ export class Hq {
       engineAdapters: Object.fromEntries(Object.entries(this.profile.engines).map(([name, engine]) => [name, engine.adapter])),
       spriteRev: this.spriteRev,
       stats: this.quests.stats(),
-      usage: this.usage,
+      usage: this.currentUsage(),
       ui: this.ui,
       labEnabled: !!this.profile.lab,
       auth: this.auth,
@@ -270,7 +275,7 @@ export class Hq {
     const cwd = creature.cwd && existsSync(creature.cwd) ? creature.cwd : this.profile.vault;
     const quest = this.quests.create(creature.id, kind, options.recordText ?? prompt, cwd, options.parentId, options.askedBy, thread?.id);
     if (options.record) this.quests.addEvent(quest.id, { kind: EventKind.USER, text: options.recordText ?? prompt });
-    const planUsage = this.usage?.fiveHour ?? 0;
+    const planUsage = this.currentUsage()?.fiveHour ?? 0;
     // The plan-usage guard is about the Claude plan; other engines have their own quotas.
     if (engine.adapter === EngineAdapter.CLAUDE && creature.autonomy === Autonomy.FULL_AUTO && planUsage >= this.profile.guard.fullAutoMaxPlanUsage) {
       this.quests.addEvent(quest.id, {
@@ -317,6 +322,11 @@ export class Hq {
       onLive: (live: QuestLiveType) => this.setLive(quest.id, live),
       onUsage: (usage: UsageType) => {
         this.usage = usage;
+        // Refresh the plan ring when the window resets, even if nothing else changes then.
+        if (this.usageTimer) clearTimeout(this.usageTimer);
+        this.usageTimer = usage.resetsAt && usage.resetsAt > Date.now()
+          ? setTimeout(() => this.emit(), Math.min(usage.resetsAt - Date.now() + 1000, MAX_TIMER_MS))
+          : undefined;
         this.emit();
       },
     };
@@ -392,7 +402,8 @@ export class Hq {
         const resumeAt = options.request ? limitResetAt(engine.adapter === EngineAdapter.CLAUDE ? this.usage : undefined, outcome.error) : undefined;
         if (options.request && resumeAt) {
           this.hold(sessionKey, options.request, resumeAt, quest.id);
-          this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: `Paused: your plan usage limit was reached. This message sends again automatically at ${clockLabel(resumeAt)}.` });
+          // Not an error the user has to act on, so it reads as a notice.
+          this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: `Plan usage limit reached. This message sends again automatically at ${clockLabel(resumeAt)}.` });
         } else {
           this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: 'Paused: your plan usage limit was reached. Retry after it resets.' });
         }
@@ -436,6 +447,7 @@ export class Hq {
       waiting.requests.push(request);
       this.quests.addEvent(waiting.questId, { kind: EventKind.USER, text: request.text });
       this.quests.addEvent(waiting.questId, { kind: EventKind.SYSTEM, text: `Held until the limit resets at ${clockLabel(waiting.resumeAt)}.` });
+      this.scheduleHeld();
       return waiting.questId;
     }
     const liveId = this.liveChats.get(sessionKey);
@@ -475,7 +487,17 @@ export class Hq {
     this.emit();
   }
 
+  // Claude Code only reports usage during a run, so once the 5-hour window has reset the last
+  // report is stale: count the window as empty until the next run reports again.
+  private currentUsage(): UsageType | undefined {
+    const usage = this.usage;
+    if (!usage?.resetsAt || usage.resetsAt > Date.now()) return usage;
+    return { ...usage, status: 'allowed', fiveHour: 0, resetsAt: undefined };
+  }
+
+  // Call after any change to held messages: saves them and times the next send.
   private scheduleHeld(): void {
+    this.quests.saveHeld(Object.fromEntries(this.held));
     if (this.heldTimer) clearTimeout(this.heldTimer);
     this.heldTimer = undefined;
     if (this.held.size === 0) return;
@@ -487,7 +509,7 @@ export class Hq {
         .filter(([, entry]) => entry.resumeAt + RESET_GRACE_MS <= now)
         .forEach(([key]) => this.releaseHeld(key));
       this.scheduleHeld();
-    }, Math.max(0, next + RESET_GRACE_MS - Date.now()));
+    }, Math.min(MAX_TIMER_MS, Math.max(0, next + RESET_GRACE_MS - Date.now())));
   }
 
   // Sends a session's held messages as one, the way queued messages go out.
@@ -495,6 +517,10 @@ export class Hq {
     const entry = this.held.get(sessionKey);
     if (!entry) return;
     this.held.delete(sessionKey);
+    this.scheduleHeld();
+    // The original run is handled now: its message goes out in the new one.
+    this.quests.addEvent(entry.questId, { kind: EventKind.SYSTEM, text: 'Sent again below.' });
+    this.quests.setStatus(entry.questId, QuestStatus.DONE);
     this.emit();
     try {
       const questId = this.chat({
@@ -520,6 +546,7 @@ export class Hq {
     if (!entry) return;
     this.held.delete(sessionKey);
     this.quests.addEvent(entry.questId, { kind: EventKind.SYSTEM, text: 'Held message cancelled.' });
+    this.quests.setStatus(entry.questId, QuestStatus.CANCELLED);
     this.scheduleHeld();
     this.emit();
   }
@@ -842,6 +869,7 @@ export class Hq {
     if (this.authTimer) clearInterval(this.authTimer);
     if (this.updateTimer) clearInterval(this.updateTimer);
     if (this.heldTimer) clearTimeout(this.heldTimer);
+    if (this.usageTimer) clearTimeout(this.usageTimer);
     this.lab.stopAll();
     this.approvals.stop();
   }

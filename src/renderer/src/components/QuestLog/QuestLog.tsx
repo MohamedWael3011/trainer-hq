@@ -24,8 +24,10 @@ const visibleEvents = (events: QuestEventType[]): QuestEventType[] => {
 const ASK_PREFIX = 'ask ';
 // Tool calls a helper agent makes are logged with this prefix (see engines/claude.ts).
 const HELPER_PREFIX = '↳ ';
+// How starting a helper is logged (see summarizeToolInput in approvals.ts).
+const HELPER_START = 'Helper agent: ';
 
-type ItemType = { kind: 'event'; event: QuestEventType; index: number } | { kind: 'helper'; steps: string[]; index: number };
+type ItemType = { kind: 'event'; event: QuestEventType; index: number } | { kind: 'helper'; task?: string; steps: string[]; index: number };
 
 // Runs of helper-agent steps fold into one row, so a busy helper doesn't bury the conversation.
 const groupHelperSteps = (events: QuestEventType[]): ItemType[] => {
@@ -33,17 +35,21 @@ const groupHelperSteps = (events: QuestEventType[]): ItemType[] => {
   events.forEach((event, index) => {
     const isStep = event.kind === EventKind.TOOL && event.text.startsWith(HELPER_PREFIX);
     const last = items[items.length - 1];
-    if (isStep && last?.kind === 'helper') last.steps.push(event.text.slice(HELPER_PREFIX.length));
-    else if (isStep) items.push({ kind: 'helper', steps: [event.text.slice(HELPER_PREFIX.length)], index });
+    const step = event.text.slice(HELPER_PREFIX.length);
+    if (isStep && last?.kind === 'helper') last.steps.push(step);
+    else if (isStep && last?.kind === 'event' && last.event.kind === EventKind.TOOL && last.event.text.startsWith(HELPER_START)) {
+      // The helper's steps belong to the line that started it: show them as one row.
+      items[items.length - 1] = { kind: 'helper', task: last.event.text.slice(HELPER_START.length), steps: [step], index: last.index };
+    } else if (isStep) items.push({ kind: 'helper', steps: [step], index });
     else items.push({ kind: 'event', event, index });
   });
   return items;
 };
 
-const HelperSteps = ({ steps }: { steps: string[] }) => (
+const HelperSteps = ({ task, steps }: { task?: string; steps: string[] }) => (
   <details className="ql-helper">
     <summary className="ql-tool">
-      <span className="ql-helper-count">Helper · {steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>
+      <span className="ql-helper-count">{task ? `Helper: ${task}` : 'Helper'} · {steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>
       <span className="ql-helper-last">{steps[steps.length - 1]}</span>
     </summary>
     <div className="ql-helper-steps">
@@ -62,7 +68,7 @@ const QuestLog = ({ state, quest }: PropsType) => {
   <div className="ql">
     {renderIf(!!quest.askedBy, <div className="ql-handoff">Asked by {creatureName(state, quest.askedBy ?? '')}</div>)}
     {groupHelperSteps(visibleEvents(quest.events)).map((item) => {
-      if (item.kind === 'helper') return <HelperSteps key={item.index} steps={item.steps} />;
+      if (item.kind === 'helper') return <HelperSteps key={item.index} task={item.task} steps={item.steps} />;
       const { event, index } = item;
       if (event.kind === EventKind.USER) return <div key={index} className="ql-me selectable">{event.text}</div>;
       if (event.kind === EventKind.TOOL && event.text.startsWith(ASK_PREFIX)) {

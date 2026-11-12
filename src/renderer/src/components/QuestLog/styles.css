@@ -14,7 +14,7 @@
 .ql-helper { display: grid; gap: 4px; }
 .ql-helper > summary { cursor: pointer; list-style: none; user-select: none; }
 .ql-helper > summary::-webkit-details-marker { display: none; }
-.ql-helper-count { flex: none; font-weight: 700; color: var(--fg-2); }
+.ql-helper-count { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: var(--fg-2); }
 .ql-helper-count::after { content: ' ▸'; color: var(--fg-3); }
 .ql-helper[open] .ql-helper-count::after { content: ' ▾'; }
 .ql-helper-last { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

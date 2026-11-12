@@ -306,12 +306,12 @@ const Party = ({ state, creatureId }: PropsType) => {
       ) : null)}
       {renderIf(showPlanWarning, (
         <div className="party-limit" role="status">
-          <span>5-hour plan usage at <b>{Math.round(planUsage * 100)}%</b>{resetsAt && resetsAt > Date.now() ? ` · resets ${clock(resetsAt)}` : ''}. If it runs out, messages wait and send after the reset.</span>
+          <span>Plan at <b>{Math.round(planUsage * 100)}%</b>{resetsAt && resetsAt > Date.now() ? `, resets ${clock(resetsAt)}` : ''}. If it runs out, messages wait for the reset.</span>
         </div>
       ))}
       {renderIf(showCompactHint, (
         <div className="party-limit party-limit-info" role="status">
-          <span>This chat is at <b>{Math.round(contextTokens / 1000)}k tokens</b>, resent on every step. Compact it to a summary to make the next steps cheaper.</span>
+          <span>Chat is at <b>{Math.round(contextTokens / 1000)}k tokens</b>, resent every step. Compacting makes the next ones cheaper.</span>
           <span className="party-limit-actions">
             <button className="btn sm ghost" onClick={() => void window.hq.compactThread(creature.id, thread?.id)}>Compact</button>
             <button className="btn sm ghost" onClick={dismissCompact}>Not now</button>

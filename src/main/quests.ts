@@ -8,6 +8,7 @@ import { profileHome } from './paths';
 const QUESTS_FILE = 'quests.json';
 const SESSIONS_FILE = 'sessions.json';
 const STATS_FILE = 'stats.json';
+const HELD_FILE = 'held.json';
 const KEEP_QUESTS = 200;
 const KEEP_EVENTS = 400;
 const TITLE_LIMIT = 90;
@@ -43,6 +44,15 @@ export class QuestStore {
     );
     this.sessions = readJson<Record<string, string>>(join(this.dir, SESSIONS_FILE), {});
     this.notesLearned = readJson<{ notesLearned: number }>(join(this.dir, STATS_FILE), { notesLearned: 0 }).notesLearned;
+  }
+
+  // Messages waiting for a plan limit to reset. Saved straight away so a restart doesn't lose them.
+  loadHeld<T>(): Record<string, T> {
+    return readJson<Record<string, T>>(join(this.dir, HELD_FILE), {});
+  }
+
+  saveHeld(held: Record<string, unknown>): void {
+    if (this.dir) writeFileSync(join(this.dir, HELD_FILE), JSON.stringify(held));
   }
 
   private persist(): void {
