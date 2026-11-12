@@ -81,6 +81,8 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.OPEN_LOCAL, (_event, target: string, baseDir?: string) => openLocal(target, [baseDir, hq.vaultPath()].filter((dir): dir is string => !!dir)));
   ipcMain.handle(Ipc.LOGIN_ITEM_GET, () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle(Ipc.NOTCH_METRICS, () => windows.notchMetrics());
+  ipcMain.handle(Ipc.DISPLAYS_LIST, () => windows.listDisplays());
+  ipcMain.handle(Ipc.UI_SET_DISPLAY, (_event, surface: 'notch' | 'dock', displayId: number) => hq.setOverlayDisplay(surface, displayId));
   ipcMain.handle(Ipc.ATTACHMENT_INSPECT, (_event, path: string) => inspectAttachment(path));
   ipcMain.handle(Ipc.ATTACHMENT_SAVE_PASTE, (_event, data: ArrayBuffer, type: string) => savePastedFile(data, type));
   ipcMain.handle(Ipc.SKILL_INSTALL, (_event, request: SkillInstallRequestType) => hq.installSkill(request));
@@ -117,7 +119,7 @@ app.whenReady().then(async () => {
   });
   hq.onLab(() => windows.dashboard?.webContents.send(Ipc.LAB_STATE));
   registerIpc();
-  windows.create(hq.isDockHidden(), hq.dockSize());
+  windows.create(hq.isDockHidden(), hq.dockSize(), hq.getState().ui.notchDisplay, hq.getState().ui.dockDisplay);
   if (!app.getLoginItemSettings().wasOpenedAtLogin) windows.openDashboard();
   runSmokeIfRequested({ windows: () => windows.labeled(), state: () => hq.getState(), chat: (request) => hq.chat(request), openNotch: () => windows.toggleNotchFromShortcut(), openView: (view) => windows.dashboard?.webContents.send(Ipc.OPEN_VIEW, view), cancel: (questId) => hq.cancel(questId), openNotchAnimated: () => windows.openNotchAnimated() });
   // Dev runs (npm run dev) have no build info and skip the check.
@@ -125,9 +127,10 @@ app.whenReady().then(async () => {
   hq.onLive((live) => windows.all().forEach((win) => win.webContents.send(Ipc.LIVE_CHANGED, live)));
   hq.onState((state) => {
     windows.setDockVisible(!state.ui.dockHidden);
+    windows.setDisplays(state.ui.notchDisplay, state.ui.dockDisplay);
     windows.all().forEach((win) => win.webContents.send(Ipc.STATE_CHANGED, state));
   });
-  stopFullscreenWatch = watchFullscreen((fullscreen) => windows.setFullscreen(fullscreen));
+  stopFullscreenWatch = watchFullscreen((displayIds) => windows.setFullscreenDisplays(displayIds));
   globalShortcut.register(NOTCH_SHORTCUT, () => windows.toggleNotchFromShortcut());
   globalShortcut.register(DOCK_SHORTCUT, () => {
     if (hq.isDockHidden()) hq.setDockHidden(false);

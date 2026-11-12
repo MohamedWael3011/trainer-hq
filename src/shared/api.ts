@@ -1,5 +1,6 @@
 import type { AutonomyType, SurfaceType } from './constants';
 import type {
+  DisplayInfoType,
   CommandInfoType,
   AppStateType,
   QuestLiveType,
@@ -30,6 +31,8 @@ export type HqApiType = {
   onDockToggle: (callback: () => void) => () => void;
   onDockExpand: (callback: () => void) => () => void;
   onDisplaysChanged: (callback: () => void) => () => void;
+  listDisplays: () => Promise<DisplayInfoType[]>;
+  setOverlayDisplay: (surface: 'notch' | 'dock', displayId: number) => Promise<void>;
   setDockHidden: (hidden: boolean) => Promise<void>;
   resizeDock: (size: DockSizeType, persist: boolean) => Promise<DockSizeType>;
   pathForFile: (file: File) => string;

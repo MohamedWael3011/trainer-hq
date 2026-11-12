@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { DaycareMode, DOCK_SHORTCUT, EngineAdapter, NOTCH_SHORTCUT, type DaycareModeType } from '@shared/constants';
-import type { AppStateType, ProfileSettingsType } from '@shared/types';
+import type { AppStateType, DisplayInfoType, ProfileSettingsType } from '@shared/types';
 import { renderIf } from '../../lib/renderIf';
 import './styles.css';
 
@@ -32,6 +32,12 @@ const Settings = ({ state, onRestartOnboarding }: PropsType) => {
   const [saved, setSaved] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [openAtLogin, setOpenAtLogin] = useState(false);
+  const [displays, setDisplays] = useState<DisplayInfoType[]>([]);
+  useEffect(() => {
+    const refresh = (): void => void window.hq.listDisplays().then(setDisplays);
+    refresh();
+    return window.hq.onDisplaysChanged(refresh);
+  }, []);
 
   const load = useCallback(() => {
     void window.hq.getSettings().then((settings) => {
@@ -188,6 +194,24 @@ const Settings = ({ state, onRestartOnboarding }: PropsType) => {
         <div className="eyebrow">App</div>
         <label className="settings-check"><input type="checkbox" checked={openAtLogin} onChange={(event) => { setOpenAtLogin(event.target.checked); void window.hq.setOpenAtLogin(event.target.checked); }} /><span>Launch at login (dock and notch only, no window)</span></label>
         <label className="settings-check"><input type="checkbox" checked={!state.ui.dockHidden} onChange={(event) => void window.hq.setDockHidden(!event.target.checked)} /><span>Show the route dock</span></label>
+        <div className="settings-grid">
+          {(['notch', 'dock'] as const).map((surface) => {
+            const chosen = surface === 'notch' ? state.ui.notchDisplay : state.ui.dockDisplay;
+            const missing = chosen !== 0 && !displays.some((display) => display.id === chosen);
+            return (
+              <label key={surface} className="settings-field">
+                <span>{surface === 'notch' ? 'Notch screen' : 'Dock screen'}</span>
+                <select value={missing ? 0 : chosen} onChange={(event) => void window.hq.setOverlayDisplay(surface, Number(event.target.value))}>
+                  <option value={0}>Main display (follows the menu bar)</option>
+                  {displays.map((display) => (
+                    <option key={display.id} value={display.id}>{display.label} · {display.width}×{display.height}{display.main ? ' · main' : ''}</option>
+                  ))}
+                </select>
+                {renderIf(missing, <small className="faint">The chosen display isn't connected; using the main display.</small>)}
+              </label>
+            );
+          })}
+        </div>
         <div className="settings-shortcuts">
           {SHORTCUTS.map(([keys, label]) => <div key={keys} className="settings-shortcut"><span className="kbd">{keys}</span><span>{label}</span></div>)}
         </div>

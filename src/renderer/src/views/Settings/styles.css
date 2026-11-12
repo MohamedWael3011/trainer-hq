@@ -8,7 +8,7 @@
 .settings-field { display: grid; gap: 5px; min-width: 0; }
 .settings-field > span { font-size: 12px; font-weight: 600; color: var(--fg-2); }
 .settings-field small { font-size: 11px; }
-.settings-block input:not([type='checkbox']), .settings-block textarea { width: 100%; min-width: 0; height: 32px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); padding: 0 10px; outline: 0; user-select: text; }
+.settings-block input:not([type='checkbox']), .settings-block textarea, .settings-block select { width: 100%; min-width: 0; height: 32px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); padding: 0 10px; outline: 0; user-select: text; }
 .settings-block textarea { height: auto; padding: 8px 10px; resize: vertical; }
 .settings-block input:focus, .settings-block textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .settings-block input:disabled { opacity: 0.6; }

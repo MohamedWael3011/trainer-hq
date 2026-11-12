@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { Ipc, type AutonomyType, type SurfaceType } from '@shared/constants';
 import type { HqApiType } from '@shared/api';
 import type {
+  DisplayInfoType,
   CommandInfoType,
   AppStateType,
   QuestLiveType,
@@ -38,6 +39,8 @@ const api: HqApiType = {
   onDockToggle: (callback: () => void) => subscribe(Ipc.DOCK_TOGGLE, callback),
   onDockExpand: (callback: () => void) => subscribe(Ipc.DOCK_EXPAND, callback),
   onDisplaysChanged: (callback: () => void) => subscribe(Ipc.DISPLAYS_CHANGED, callback),
+  listDisplays: (): Promise<DisplayInfoType[]> => ipcRenderer.invoke(Ipc.DISPLAYS_LIST),
+  setOverlayDisplay: (surface: 'notch' | 'dock', displayId: number): Promise<void> => ipcRenderer.invoke(Ipc.UI_SET_DISPLAY, surface, displayId),
   setDockHidden: (hidden: boolean): Promise<void> => ipcRenderer.invoke(Ipc.DOCK_SET_HIDDEN, hidden),
   resizeDock: (size: DockSizeType, persist: boolean): Promise<DockSizeType> => ipcRenderer.invoke(Ipc.DOCK_RESIZE, size, persist),
   pathForFile: (file: File): string => webUtils.getPathForFile(file),

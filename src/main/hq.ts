@@ -822,6 +822,12 @@ export class Hq {
     this.loadProfile();
   }
 
+  setOverlayDisplay(surface: 'notch' | 'dock', displayId: number): void {
+    this.ui = surface === 'notch' ? { ...this.ui, notchDisplay: displayId } : { ...this.ui, dockDisplay: displayId };
+    saveUi(this.ui);
+    this.emit();
+  }
+
   setDockHidden(hidden: boolean): void {
     this.ui = { ...this.ui, dockHidden: hidden };
     saveUi(this.ui);

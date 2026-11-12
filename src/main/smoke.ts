@@ -87,7 +87,8 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
     }
     // THQ_SMOKE_JS: run a snippet in the dashboard before the screenshots (e.g. type into the composer).
     if (process.env.THQ_SMOKE_JS) {
-      await host.windows().find(([name]) => name === 'dashboard')?.[1].webContents.executeJavaScript(process.env.THQ_SMOKE_JS);
+      const result: unknown = await host.windows().find(([name]) => name === 'dashboard')?.[1].webContents.executeJavaScript(process.env.THQ_SMOKE_JS);
+      if (result !== undefined) process.stdout.write(`js ${JSON.stringify(result)}\n`);
       await new Promise((resolve) => setTimeout(resolve, 1200));
     }
     if (process.env.THQ_SMOKE_NOTCH_OPEN) {

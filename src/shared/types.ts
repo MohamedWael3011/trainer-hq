@@ -184,6 +184,17 @@ export type UiStateType = {
   dockHidden: boolean;
   dockSize: DockSizeType;
   onboarded: boolean;
+  // Which display the notch and dock sit on: a display id, or 0 for the main display (menu bar).
+  notchDisplay: number;
+  dockDisplay: number;
+};
+
+export type DisplayInfoType = {
+  id: number;
+  label: string;
+  main: boolean;
+  width: number;
+  height: number;
 };
 
 export type AppStateType = {

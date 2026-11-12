@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { BrowserWindow, screen } from 'electron';
 import { Ipc, MAX_DOCK_HEIGHT, MIN_DOCK_SIZE, Surface, type SurfaceType } from '@shared/constants';
-import type { DockSizeType, NotchMetricsType } from '@shared/types';
+import type { DisplayInfoType, DockSizeType, NotchMetricsType } from '@shared/types';
 
 // Displays report several changes while a monitor connects; wait for them to settle.
 const DISPLAY_SETTLE_MS = 400;
@@ -54,7 +54,41 @@ export class Windows {
   private dockWanted = true;
   private dockSize: DockSizeType = MIN_DOCK_SIZE;
   private placeTimer: NodeJS.Timeout | undefined;
-  private fullscreen = false;
+  // Chosen displays (0 = the main display) and which displays show a full-screen app right now.
+  private notchDisplayId = 0;
+  private dockDisplayId = 0;
+  private fullscreenDisplays = new Set<number>();
+
+  // A chosen display that's been unplugged falls back to the main one.
+  private displayFor(id: number): Electron.Display {
+    return (id ? screen.getAllDisplays().find((display) => display.id === id) : undefined) ?? screen.getPrimaryDisplay();
+  }
+
+  private get notchFullscreen(): boolean {
+    return this.fullscreenDisplays.has(this.displayFor(this.notchDisplayId).id);
+  }
+
+  private get dockFullscreen(): boolean {
+    return this.fullscreenDisplays.has(this.displayFor(this.dockDisplayId).id);
+  }
+
+  listDisplays(): DisplayInfoType[] {
+    const main = screen.getPrimaryDisplay().id;
+    return screen.getAllDisplays().map((display) => ({
+      id: display.id,
+      label: display.label || (display.internal ? 'Built-in display' : 'External display'),
+      main: display.id === main,
+      width: display.size.width,
+      height: display.size.height,
+    }));
+  }
+
+  setDisplays(notchDisplay: number, dockDisplay: number): void {
+    if (notchDisplay === this.notchDisplayId && dockDisplay === this.dockDisplayId) return;
+    this.notchDisplayId = notchDisplay;
+    this.dockDisplayId = dockDisplay;
+    this.replace(0);
+  }
 
   // Clicking or typing in the notch or dock can activate the app, which macOS reports as a
   // reopen. Treat the overlays as "in use" while the pointer is over them or they have focus,
@@ -72,7 +106,7 @@ export class Windows {
   }
 
   private dockBounds(size: DockSizeType): Electron.Rectangle {
-    const area = screen.getPrimaryDisplay().workArea;
+    const area = this.displayFor(this.dockDisplayId).workArea;
     const width = Math.round(Math.min(Math.max(size.width, MIN_DOCK_SIZE.width), area.width - 40));
     const height = Math.round(Math.min(Math.max(size.height, MIN_DOCK_SIZE.height), MAX_DOCK_HEIGHT));
     return {
@@ -90,9 +124,9 @@ export class Windows {
     return { width: bounds.width, height: bounds.height };
   }
 
-  // The notch sits at the top centre of the main display (the one with the menu bar).
+  // The notch sits at the top centre of its display (by default the main one, with the menu bar).
   private notchBounds(): Electron.Rectangle {
-    const bounds = screen.getPrimaryDisplay().bounds;
+    const bounds = this.displayFor(this.notchDisplayId).bounds;
     return {
       x: Math.round(bounds.x + (bounds.width - NOTCH_SIZE.width) / 2),
       y: bounds.y,
@@ -102,7 +136,7 @@ export class Windows {
 
   // Plugging in a monitor, unplugging it, or changing which display is main moves the menu bar.
   // Move the notch and dock with it, and let the notch redraw for a display with or without a notch.
-  private replace(): void {
+  private replace(delay = DISPLAY_SETTLE_MS): void {
     if (this.placeTimer) clearTimeout(this.placeTimer);
     this.placeTimer = setTimeout(() => {
       this.placeTimer = undefined;
@@ -110,12 +144,18 @@ export class Windows {
         this.notch.setBounds(this.notchBounds());
         this.notch.webContents.send(Ipc.DISPLAYS_CHANGED);
       }
+      if (this.dashboard && !this.dashboard.isDestroyed()) this.dashboard.webContents.send(Ipc.DISPLAYS_CHANGED);
       if (!this.dock.isDestroyed()) this.dock.setBounds(this.dockBounds(this.dockSize));
-    }, DISPLAY_SETTLE_MS);
+      // Moving to another display can move them onto (or off) a full-screen app.
+      this.applyNotch();
+      this.applyDock();
+    }, delay);
   }
 
-  create(dockHidden: boolean, dockSize: DockSizeType): void {
+  create(dockHidden: boolean, dockSize: DockSizeType, notchDisplay = 0, dockDisplay = 0): void {
     this.dockSize = dockSize;
+    this.notchDisplayId = notchDisplay;
+    this.dockDisplayId = dockDisplay;
     this.dock = overlay(this.dockBounds(dockSize), true);
     this.dock.setAlwaysOnTop(true, FLOATING_LEVEL);
     this.dock.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: false });
@@ -124,7 +164,7 @@ export class Windows {
     this.trackOverlay(this.dock);
     this.dockWanted = !dockHidden;
     this.dock.once('ready-to-show', () => {
-      if (this.dockWanted && !this.fullscreen) this.dock.showInactive();
+      if (this.dockWanted && !this.dockFullscreen) this.dock.showInactive();
     });
 
     const notchBounds = this.notchBounds();
@@ -136,7 +176,7 @@ export class Windows {
     load(this.notch, Surface.NOTCH);
     this.trackOverlay(this.notch);
     this.notch.once('ready-to-show', () => {
-      if (!this.fullscreen) this.notch.showInactive();
+      if (!this.notchFullscreen) this.notch.showInactive();
     });
     const replace = (): void => this.replace();
     screen.on('display-added', replace);
@@ -145,7 +185,8 @@ export class Windows {
   }
 
   notchMetrics(): NotchMetricsType {
-    const display = screen.getPrimaryDisplay();
+    const display = this.displayFor(this.notchDisplayId);
+    // Only the display with the menu bar has a menu-bar band; elsewhere the pill sits at the very top.
     const barHeight = Math.max(24, display.workArea.y - display.bounds.y);
     const hasNotch = barHeight >= HARDWARE_NOTCH_MIN_BAR;
     return {
@@ -163,13 +204,17 @@ export class Windows {
     this.applyDock();
   }
 
-  // Another app is full screen on the primary display: get out of its way.
-  setFullscreen(fullscreen: boolean): void {
-    if (fullscreen === this.fullscreen) return;
-    this.fullscreen = fullscreen;
+  // Displays showing a full-screen app: the notch and dock get out of the way on theirs.
+  setFullscreenDisplays(ids: number[]): void {
+    this.fullscreenDisplays = new Set(ids);
     this.applyDock();
+    this.applyNotch();
+  }
+
+  private applyNotch(): void {
     if (this.notch.isDestroyed()) return;
-    if (fullscreen) {
+    if (this.notchFullscreen) {
+      if (!this.notch.isVisible()) return;
       this.notch.setIgnoreMouseEvents(true, { forward: true });
       this.interactive.delete(Surface.NOTCH);
       this.notch.hide();
@@ -179,7 +224,7 @@ export class Windows {
   }
 
   private applyDock(): void {
-    const visible = this.dockWanted && !this.fullscreen;
+    const visible = this.dockWanted && !this.dockFullscreen;
     if (this.dock.isDestroyed() || visible === this.dock.isVisible()) return;
     if (visible) {
       this.dock.showInactive();
@@ -198,7 +243,7 @@ export class Windows {
     if (interactive) this.interactive.add(surface);
     else this.interactive.delete(surface);
     win.setIgnoreMouseEvents(!interactive, { forward: true });
-    if (!interactive && surface === Surface.NOTCH && this.fullscreen) {
+    if (!interactive && surface === Surface.NOTCH && this.notchFullscreen) {
       win.hide();
     } else if (!interactive && surface === Surface.NOTCH && win.isFocused()) {
       win.hide();

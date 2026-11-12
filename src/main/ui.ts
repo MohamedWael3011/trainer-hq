@@ -5,7 +5,7 @@ import type { UiStateType } from '@shared/types';
 import { appHome } from './paths';
 
 const UI_FILE = 'ui.json';
-const DEFAULT_UI: UiStateType = { dockHidden: false, dockSize: { ...DEFAULT_DOCK_SIZE }, onboarded: false };
+const DEFAULT_UI: UiStateType = { dockHidden: false, dockSize: { ...DEFAULT_DOCK_SIZE }, onboarded: false, notchDisplay: 0, dockDisplay: 0 };
 
 const uiPath = (): string => join(appHome(), UI_FILE);
 

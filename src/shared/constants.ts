@@ -198,6 +198,8 @@ export const Ipc = {
   LOGIN_ITEM_GET: 'app:login-item-get',
   NOTCH_METRICS: 'notch:metrics',
   DISPLAYS_CHANGED: 'displays:changed',
+  DISPLAYS_LIST: 'displays:list',
+  UI_SET_DISPLAY: 'ui:set-display',
   DOCK_TOGGLE: 'dock:toggle',
   DOCK_EXPAND: 'dock:expand',
   DOCK_SET_HIDDEN: 'dock:set-hidden',
