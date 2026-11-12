@@ -10,3 +10,15 @@
 .ql-usage { font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; padding: 1px 7px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); }
 .ql-usage-warn { color: var(--amber, var(--red)); border-color: color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); font-weight: 600; }
 .ql-handoff { justify-self: end; font-size: 11px; font-weight: 700; color: var(--violet); padding: 2px 8px; border-radius: 8px; background: color-mix(in srgb, var(--violet) 12%, transparent); }
+
+.ql-helper { display: grid; gap: 4px; }
+.ql-helper > summary { cursor: pointer; list-style: none; user-select: none; }
+.ql-helper > summary::-webkit-details-marker { display: none; }
+.ql-helper-count { flex: none; font-weight: 700; color: var(--fg-2); }
+.ql-helper-count::after { content: ' ▸'; color: var(--fg-3); }
+.ql-helper[open] .ql-helper-count::after { content: ' ▾'; }
+.ql-helper-last { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ql-helper[open] .ql-helper-last { display: none; }
+.ql-helper-steps { display: grid; gap: 3px; margin-left: 45px; padding-left: 12px; border-left: 1.5px solid var(--line-2); font-size: 12px; color: var(--fg-3); }
+.ql-helper-step { overflow-wrap: anywhere; }
+@media (hover: hover) and (pointer: fine) { .ql-helper > summary:hover .ql-helper-count { color: var(--fg); } }

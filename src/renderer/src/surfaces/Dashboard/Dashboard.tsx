@@ -15,6 +15,32 @@ import Onboarding from '../../views/Onboarding/Onboarding';
 import { renderIf } from '../../lib/renderIf';
 import './styles.css';
 
+const RING_RADIUS = 7;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+const RING_WARN = 0.6;
+const RING_HIGH = 0.85;
+
+const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+// The 5-hour plan window at a glance; opens the Trainer page for the full picture.
+const PlanRing = ({ state, onOpen }: { state: AppStateType; onOpen: () => void }) => {
+  const usage = state.usage;
+  if (!usage || usage.fiveHour === undefined) return null;
+  const value = Math.min(1, Math.max(0, usage.fiveHour));
+  const level = value >= RING_HIGH ? 'high' : value >= RING_WARN ? 'warn' : 'ok';
+  const resets = usage.resetsAt && usage.resetsAt > Date.now() ? ` · resets ${clock(usage.resetsAt)}` : '';
+  const weekly = usage.sevenDay !== undefined ? ` · 7-day ${Math.round(usage.sevenDay * 100)}%` : '';
+  return (
+    <button className={`dash-plan dash-plan-${level}`} onClick={onOpen} title={`5-hour plan usage ${Math.round(value * 100)}%${weekly}${resets}`}>
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <circle cx="9" cy="9" r={RING_RADIUS} className="dash-plan-track" />
+        <circle cx="9" cy="9" r={RING_RADIUS} className="dash-plan-fill" strokeDasharray={`${value * RING_LENGTH} ${RING_LENGTH}`} transform="rotate(-90 9 9)" />
+      </svg>
+      <span>{Math.round(value * 100)}%</span>
+    </button>
+  );
+};
+
 type PropsType = {
   state: AppStateType;
 };
@@ -117,6 +143,7 @@ const Dashboard = ({ state }: PropsType) => {
       <header className="dash-bar">
         <span className="dash-title">Trainer HQ</span>
         <div className="dash-profile-bar">
+          <PlanRing state={state} onOpen={() => setView(View.TRAINER)} />
           <div className="seg dash-profiles" role="group" aria-label="Profile">
             {state.profiles.map((profile) => (
               <button key={profile.id} aria-pressed={profile.id === state.profile.id} onClick={() => void window.hq.switchProfile(profile.id)}>

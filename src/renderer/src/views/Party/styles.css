@@ -29,3 +29,9 @@
 .party-clear-btn + .party-clear-btn { margin-left: 4px; }
 .party-thread-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; font-size: 12px; }
 .party-thread-actions { margin-left: auto; display: flex; gap: 4px; }
+
+.party-limit { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 10px; margin: 0 22px 8px; padding: 7px 8px 7px 12px; border-radius: 10px; font-size: 12px; color: var(--fg-2); background: color-mix(in srgb, var(--amber) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--amber) 28%, transparent); }
+.party-limit b { color: var(--fg); }
+.party-limit-held { color: var(--fg); }
+.party-limit-actions { display: flex; gap: 4px; }
+.party-limit-info { background: color-mix(in srgb, var(--blue) 8%, var(--surface)); border-color: color-mix(in srgb, var(--blue) 24%, transparent); }

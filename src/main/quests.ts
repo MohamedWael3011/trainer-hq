@@ -104,6 +104,13 @@ export class QuestStore {
     this.persist();
   }
 
+  markFreshSession(id: string): void {
+    const quest = this.get(id);
+    if (!quest) return;
+    quest.freshSession = true;
+    this.persist();
+  }
+
   setUsage(id: string, usage: QuestUsageType): void {
     const quest = this.get(id);
     if (!quest) return;

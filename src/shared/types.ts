@@ -100,6 +100,8 @@ export type QuestType = {
   askedBy?: string;
   threadId?: string;
   usage?: QuestUsageType;
+  // The run started a new Claude Code session, so its first turn paid the one-time setup.
+  freshSession?: boolean;
 };
 
 export type ThreadType = {
@@ -202,7 +204,17 @@ export type AppStateType = {
   labEnabled: boolean;
   auth?: AuthStatusType;
   update?: UpdateInfoType;
+  held: HeldChatType[];
   errors: string[];
+};
+
+// Chat messages waiting for the plan usage limit to reset.
+export type HeldChatType = {
+  creatureId: string;
+  threadId?: string;
+  questId: string;
+  resumeAt: number;
+  count: number;
 };
 
 export type NotchMetricsType = {

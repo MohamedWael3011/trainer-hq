@@ -163,6 +163,8 @@ export const Ipc = {
   THREAD_CLEAR: 'thread:clear',
   THREAD_COMPACT: 'thread:compact',
   THREAD_TERMINAL: 'thread:terminal',
+  THREAD_HELD_SEND: 'thread:held-send',
+  THREAD_HELD_CANCEL: 'thread:held-cancel',
   UPDATE_CHECK: 'update:check',
   UPDATE_INSTALL: 'update:install',
   LAB_STATE: 'lab:state',

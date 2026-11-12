@@ -7,12 +7,14 @@ import { useQuestLive } from '../../hooks/useQuestLive';
 import Badge from '../../components/Badge/Badge';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
 import { renderIf } from '../../lib/renderIf';
-import { STATUS_LABEL, STATUS_TONE, creatureName, isLive, parseMention, percent } from '../../lib/format';
+import { BadgeTone, STATUS_LABEL, STATUS_TONE, creatureName, isLive, parseMention, percent } from '../../lib/format';
 import './styles.css';
 
 type PropsType = {
   state: AppStateType;
 };
+
+const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const NotchLive = ({ quest }: { quest: QuestType }) => <LiveBadge quest={quest} live={useQuestLive(quest.id)} />;
 
@@ -43,6 +45,7 @@ const Notch = ({ state }: PropsType) => {
   const [hardware, setHardware] = useState(false);
   const live = state.quests.filter(isLive);
   const recent = state.quests.slice(0, RECENT_COUNT);
+  const heldFor = (questId: string) => state.held.find((entry) => entry.questId === questId);
   const approval = state.approvals[0];
   const [target, setTarget] = useState(readTarget);
   const fallbackCreature = state.quests[0]?.creatureId ?? state.creatures[0]?.id ?? '';
@@ -200,7 +203,11 @@ const Notch = ({ state }: PropsType) => {
                 >
                   <Sprite state={state} id={quest.creatureId} className="notch-row-sprite" />
                   <span className="notch-row-text"><b>{creatureName(state, quest.creatureId)}</b> · {quest.title}</span>
-                  {isLive(quest) ? <NotchLive quest={quest} /> : <Badge tone={STATUS_TONE[quest.status]}>{STATUS_LABEL[quest.status]}</Badge>}
+                  {isLive(quest)
+                    ? <NotchLive quest={quest} />
+                    : heldFor(quest.id)
+                      ? <Badge tone={BadgeTone.WAIT}>Sends {clock(heldFor(quest.id)?.resumeAt ?? 0)}</Badge>
+                      : <Badge tone={STATUS_TONE[quest.status]}>{STATUS_LABEL[quest.status]}</Badge>}
                 </button>
               ))}
               {renderIf(recent.length === 0, <p className="notch-empty">No quests yet. Type @name and a task.</p>)}

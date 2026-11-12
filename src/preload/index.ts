@@ -63,6 +63,8 @@ const api: HqApiType = {
   clearThread: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_CLEAR, creatureId, threadId),
   compactThread: (creatureId: string, threadId?: string): Promise<string> => ipcRenderer.invoke(Ipc.THREAD_COMPACT, creatureId, threadId),
   openThreadInTerminal: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_TERMINAL, creatureId, threadId),
+  sendHeldNow: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_HELD_SEND, creatureId, threadId),
+  cancelHeld: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_HELD_CANCEL, creatureId, threadId),
   checkUpdate: (): Promise<UpdateInfoType | undefined> => ipcRenderer.invoke(Ipc.UPDATE_CHECK),
   installUpdate: (): Promise<void> => ipcRenderer.invoke(Ipc.UPDATE_INSTALL),
   onOpenView: (callback: (view: string) => void) => subscribe(Ipc.OPEN_VIEW, callback),

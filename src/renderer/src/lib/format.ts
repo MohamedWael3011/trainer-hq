@@ -83,6 +83,8 @@ export const formatCost = (costUsd: number | undefined): string | undefined => {
 };
 
 const LARGE_CONTEXT_TOKENS = 100_000;
+// Roughly what Claude Code's first turn caches: its own system prompt, tool definitions and the creature's brain.
+const SESSION_SETUP_TOKENS = 25_000;
 
 export const questUsageSummary = (
   quest: QuestType,
@@ -95,12 +97,13 @@ export const questUsageSummary = (
   if (totalTokens === 0 && !costText) return undefined;
   const parts: string[] = [];
   if (totalTokens > 0) {
-    parts.push(`${formatTokens(freshTokens > 0 ? freshTokens : totalTokens)} tok`);
+    parts.push(`${formatTokens(freshTokens > 0 ? freshTokens : totalTokens)} tok${quest.freshSession ? ' (incl. setup)' : ''}`);
     if (usage.cacheReadTokens > 0) parts.push(`${formatTokens(usage.cacheReadTokens)} cached`);
   }
   if (usage.contextTokens) parts.push(`ctx ${formatTokens(usage.contextTokens)}`);
   if (costText) parts.push(costText);
   const detailParts = [
+    quest.freshSession ? `New session: the first turn writes Claude Code's own instructions, tools and the creature's brain to the cache (about 20k tokens, the same as starting claude in a terminal). Later turns read them back at a tenth of the price` : undefined,
     usage.contextTokens ? `Conversation size: ${usage.contextTokens.toLocaleString()} tokens (resent on every step; Clear the chat to reset)` : undefined,
     usage.model ? `Model: ${usage.model}` : undefined,
     `Input: ${usage.inputTokens.toLocaleString()}`,
@@ -109,7 +112,9 @@ export const questUsageSummary = (
     usage.cacheReadTokens > 0 ? `Cache read: ${usage.cacheReadTokens.toLocaleString()}` : undefined,
     usage.costUsd !== undefined ? `Cost: $${usage.costUsd.toFixed(4)}` : undefined,
   ].filter(Boolean);
-  const expensive = (usage.costUsd ?? 0) >= EXPENSIVE_COST_USD || freshTokens >= EXPENSIVE_FRESH_TOKENS || (usage.contextTokens ?? 0) >= LARGE_CONTEXT_TOKENS;
+  // A new session's one-time setup isn't a sign of waste, so it gets that much headroom before the warning.
+  const freshLimit = EXPENSIVE_FRESH_TOKENS + (quest.freshSession ? SESSION_SETUP_TOKENS : 0);
+  const expensive = (usage.costUsd ?? 0) >= EXPENSIVE_COST_USD || freshTokens >= freshLimit || (usage.contextTokens ?? 0) >= LARGE_CONTEXT_TOKENS;
   return {
     label: parts.join(' · '),
     detail: detailParts.join(' · '),

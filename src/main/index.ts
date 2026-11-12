@@ -68,6 +68,8 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.UPDATE_CHECK, () => hq.checkUpdate());
   ipcMain.handle(Ipc.UPDATE_INSTALL, () => hq.installUpdate());
   ipcMain.handle(Ipc.THREAD_TERMINAL, (_event, creatureId: string, threadId?: string) => hq.openThreadInTerminal(creatureId, threadId));
+  ipcMain.handle(Ipc.THREAD_HELD_SEND, (_event, creatureId: string, threadId?: string) => hq.sendHeldNow(creatureId, threadId));
+  ipcMain.handle(Ipc.THREAD_HELD_CANCEL, (_event, creatureId: string, threadId?: string) => hq.cancelHeld(creatureId, threadId));
   ipcMain.handle(Ipc.AUTH_LOGIN, () => hq.openLogin());
   ipcMain.handle(Ipc.PROFILE_CREATE, (_event, request: ProfileCreateRequestType) => hq.createProfile(request));
   ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string) => windows.openDashboard(creatureId));

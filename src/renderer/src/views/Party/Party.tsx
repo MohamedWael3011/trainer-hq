@@ -20,6 +20,22 @@ type PropsType = {
 
 const HISTORY = 12;
 const COMPOSER_MAX_HEIGHT = 200;
+// From here on the chat shows how close the 5-hour plan window is to its limit.
+const PLAN_WARN_AT = 0.8;
+// Past this size every step resends a lot; suggest compacting before auto-compact has to.
+const SUGGEST_COMPACT_TOKENS = 70_000;
+const DISMISSED_COMPACT_KEY = 'thq.compactHintDismissed';
+const COMPACT_HINT_REGROW_TOKENS = 30_000;
+
+const readDismissed = (): Record<string, number> => {
+  try {
+    return JSON.parse(localStorage.getItem(DISMISSED_COMPACT_KEY) ?? '{}') as Record<string, number>;
+  } catch {
+    return {};
+  }
+};
+
+const clock = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const Party = ({ state, creatureId }: PropsType) => {
   const creature = creatureById(state, creatureId);
@@ -128,6 +144,27 @@ const Party = ({ state, creatureId }: PropsType) => {
   const busy = quests.some(isLive);
   const isClaude = !!creature && state.engineAdapters[creature.engine] === EngineAdapter.CLAUDE;
   const canCompact = isClaude && !busy && quests.length > 0;
+  const held = state.held.find((entry) => entry.creatureId === creature?.id && entry.threadId === thread?.id);
+  const planUsage = state.usage?.fiveHour ?? 0;
+  const resetsAt = state.usage?.resetsAt;
+  const showPlanWarning = isClaude && !held && planUsage >= PLAN_WARN_AT;
+  // quests run oldest to newest, so the last one with a size is the chat's current size.
+  const contextTokens = [...quests].reverse().find((quest) => quest.usage?.contextTokens)?.usage?.contextTokens ?? 0;
+  const chatKey = `${creatureId}:${threadId ?? ''}`;
+  const [dismissedCompact, setDismissedCompact] = useState(readDismissed);
+  // "Not now" holds until the chat grows by another step's worth of reading.
+  const dismissedAt = dismissedCompact[chatKey];
+  const showCompactHint = canCompact && !held && contextTokens >= SUGGEST_COMPACT_TOKENS
+    && (dismissedAt === undefined || contextTokens >= dismissedAt + COMPACT_HINT_REGROW_TOKENS || contextTokens < dismissedAt);
+  const dismissCompact = (): void => {
+    const next = { ...dismissedCompact, [chatKey]: contextTokens };
+    setDismissedCompact(next);
+    try {
+      localStorage.setItem(DISMISSED_COMPACT_KEY, JSON.stringify(next));
+    } catch {
+      // Storage unavailable; the hint just comes back next time.
+    }
+  };
   const lastEventCount = quests[quests.length - 1]?.events.length ?? 0;
   const lastQuest = quests[quests.length - 1];
   const lastLive = useQuestLive(lastQuest && isLive(lastQuest) ? lastQuest.id : undefined);
@@ -256,12 +293,37 @@ const Party = ({ state, creatureId }: PropsType) => {
           ))}
         </div>
       ))}
+      {renderIf(!!held, held ? (
+        <div className="party-limit party-limit-held" role="status">
+          <span>
+            Plan limit reached. {held.count === 1 ? 'Your message sends' : `${held.count} messages send`} automatically at <b>{clock(held.resumeAt)}</b>.
+          </span>
+          <span className="party-limit-actions">
+            <button className="btn sm ghost" onClick={() => void window.hq.sendHeldNow(creature.id, thread?.id)}>Try now</button>
+            <button className="btn sm ghost" onClick={() => void window.hq.cancelHeld(creature.id, thread?.id)}>Cancel</button>
+          </span>
+        </div>
+      ) : null)}
+      {renderIf(showPlanWarning, (
+        <div className="party-limit" role="status">
+          <span>5-hour plan usage at <b>{Math.round(planUsage * 100)}%</b>{resetsAt && resetsAt > Date.now() ? ` · resets ${clock(resetsAt)}` : ''}. If it runs out, messages wait and send after the reset.</span>
+        </div>
+      ))}
+      {renderIf(showCompactHint, (
+        <div className="party-limit party-limit-info" role="status">
+          <span>This chat is at <b>{Math.round(contextTokens / 1000)}k tokens</b>, resent on every step. Compact it to a summary to make the next steps cheaper.</span>
+          <span className="party-limit-actions">
+            <button className="btn sm ghost" onClick={() => void window.hq.compactThread(creature.id, thread?.id)}>Compact</button>
+            <button className="btn sm ghost" onClick={dismissCompact}>Not now</button>
+          </span>
+        </div>
+      ))}
       <form className="party-composer" onSubmit={send}>
         <label className="party-attach" title="Attach files">
           +
           <input type="file" multiple onChange={onPick} />
         </label>
-        <textarea ref={inputRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} onPaste={onPaste} placeholder={busy ? `${creature.name} is working. ${isClaude ? 'Send a message to steer it mid-task.' : 'New messages wait until it finishes.'}` : `Message ${creature.name} · Shift+Enter for a new line · drop or paste files and screenshots`} />
+        <textarea ref={inputRef} rows={1} value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={onComposerKey} onPaste={onPaste} placeholder={held ? `Plan limit reached. Messages you send now go out at ${clock(held.resumeAt)}.` : busy ? `${creature.name} is working. ${isClaude ? 'Send a message to steer it mid-task.' : 'New messages wait until it finishes.'}` : `Message ${creature.name} · Shift+Enter for a new line · drop or paste files and screenshots`} />
         <button className="btn primary sm" type="submit" disabled={!draft.trim()}>Send</button>
       </form>
       {renderIf(dragging, <div className="party-drop">Drop files for {creature.name}</div>)}

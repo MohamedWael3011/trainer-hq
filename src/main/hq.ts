@@ -38,6 +38,7 @@ import { ApprovalBroker, type AskRequestType } from './approvals';
 import { attachmentDirs, detectPaths, installSkill, prepareAttachments } from './attachments';
 import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from './auth';
 import { checkForUpdate } from './updates';
+import { limitResetAt } from './limits';
 import { claudeFlagSupport, resetFlagSupport } from './engines/claudeFlags';
 import { buildSystemPrompt } from './brain';
 import { addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
@@ -59,6 +60,16 @@ import { loadUi, saveUi } from './ui';
 import { listAntigravityModels, planAntigravityArgs, runAntigravity } from './engines/antigravity';
 
 const AGY_SESSION_PREFIX = 'agy:';
+
+type HeldEntryType = {
+  creatureId: string;
+  threadId?: string;
+  resumeAt: number;
+  questId: string;
+  requests: ChatRequestType[];
+};
+
+const clockLabel = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const DAYCARE_MODEL = 'haiku';
 
 const STATE_THROTTLE_MS = 60;
@@ -69,6 +80,8 @@ const AUTH_REFRESH_MS = 10 * 60_000;
 // GitHub allows 60 anonymous API calls an hour; a check every few hours is plenty.
 const UPDATE_CHECK_MS = 3 * 60 * 60_000;
 const UPDATE_FIRST_CHECK_MS = 20_000;
+// Wait a little past the stated reset so the first retry doesn't land a moment too early.
+const RESET_GRACE_MS = 60_000;
 const AUTH_ERROR_PATTERN = /\/login|not logged in|unauthori[sz]ed|invalid api key|authentication|401/i;
 
 export class Hq {
@@ -91,6 +104,9 @@ export class Hq {
   private liveListeners = new Set<(live: Record<string, QuestLiveType>) => void>();
   private liveTimer: NodeJS.Timeout | undefined;
   private chatQueue = new Map<string, ChatRequestType[]>();
+  // Messages that hit the plan usage limit, per session, sent again once the limit resets.
+  private held = new Map<string, HeldEntryType>();
+  private heldTimer: NodeJS.Timeout | undefined;
   private stopWatching: (() => void) | undefined;
   private emitTimer: NodeJS.Timeout | undefined;
   private listeners = new Set<(state: AppStateType) => void>();
@@ -216,6 +232,13 @@ export class Hq {
       labEnabled: !!this.profile.lab,
       auth: this.auth,
       update: this.update,
+      held: Array.from(this.held.values()).map((entry) => ({
+        creatureId: entry.creatureId,
+        threadId: entry.threadId,
+        questId: entry.questId,
+        resumeAt: entry.resumeAt,
+        count: entry.requests.length,
+      })),
       errors: this.errors,
     };
   }
@@ -237,7 +260,7 @@ export class Hq {
     return env;
   }
 
-  private launch(creature: CreatureType, kind: QuestKindType, prompt: string, options: { resume: boolean; record: boolean; parentId?: string; askedBy?: string; recordText?: string; thread?: ThreadType }): string {
+  private launch(creature: CreatureType, kind: QuestKindType, prompt: string, options: { resume: boolean; record: boolean; parentId?: string; askedBy?: string; recordText?: string; thread?: ThreadType; request?: ChatRequestType }): string {
     const thread = options.thread;
     if (thread?.cwd) creature = { ...creature, cwd: thread.cwd };
     const sessionKey = threadKey(creature.id, thread?.id);
@@ -305,6 +328,7 @@ export class Hq {
           questId: quest.id,
         },
       });
+      if (!claudeSession && !isCompact) this.quests.markFreshSession(quest.id);
       handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(), timeoutMs: plan.timeoutMs, callbacks });
     } else if (engine.adapter === EngineAdapter.ANTIGRAVITY) {
       const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
@@ -353,7 +377,13 @@ export class Hq {
         return;
       }
       if (outcome.usageLimited) {
-        this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: 'Paused: your plan usage limit was reached. Retry after it resets.' });
+        const resumeAt = options.request ? limitResetAt(this.usage, outcome.error) : undefined;
+        if (options.request && resumeAt) {
+          this.hold(sessionKey, options.request, resumeAt, quest.id);
+          this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: `Paused: your plan usage limit was reached. This message sends again automatically at ${clockLabel(resumeAt)}.` });
+        } else {
+          this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: 'Paused: your plan usage limit was reached. Retry after it resets.' });
+        }
         this.quests.setStatus(quest.id, QuestStatus.PAUSED);
         return;
       }
@@ -379,10 +409,19 @@ export class Hq {
     return (size ?? 0) >= idleResetMinTokens;
   }
 
-  chat(request: ChatRequestType): string {
+  // `recorded`: the message is already in the chat log (a held message being sent again).
+  chat(request: ChatRequestType, recorded = false): string {
     const creature = this.creature(request.creatureId);
     const thread = this.threads.get(request.threadId);
     const sessionKey = threadKey(creature.id, thread?.id);
+    const waiting = this.held.get(sessionKey);
+    if (waiting) {
+      // Sending now would only fail again; add it to what goes out after the reset.
+      waiting.requests.push(request);
+      this.quests.addEvent(waiting.questId, { kind: EventKind.USER, text: request.text });
+      this.quests.addEvent(waiting.questId, { kind: EventKind.SYSTEM, text: `Held until the limit resets at ${clockLabel(waiting.resumeAt)}.` });
+      return waiting.questId;
+    }
     const liveId = this.liveChats.get(sessionKey);
     if (liveId) {
       const hasFiles = (request.attachments ?? []).length > 0 || detectPaths(request.text).length > 0;
@@ -399,12 +438,74 @@ export class Hq {
     }
     const paths = Array.from(new Set([...(request.attachments ?? []), ...detectPaths(request.text)]));
     const prepared = prepareAttachments(paths);
-    if (prepared.length === 0) return this.launch(creature, QuestKind.CHAT, request.text, { resume: true, record: true, thread });
+    if (prepared.length === 0) return this.launch(creature, QuestKind.CHAT, request.text, { resume: true, record: !recorded, thread, request });
     const moved = prepared.filter((entry) => entry.source !== entry.target);
     const notes = moved.map((entry) => `- ${entry.source} is available at ${entry.target}${entry.source.endsWith('.zip') ? ' (unzipped)' : ''}`);
     const prompt = notes.length > 0 ? `${request.text}\n\n${notes.join('\n')}` : request.text;
     const withAccess = { ...creature, addDirs: [...creature.addDirs, ...attachmentDirs(prepared.map((entry) => entry.target))] };
-    return this.launch(withAccess, QuestKind.CHAT, prompt, { resume: true, record: true, thread });
+    return this.launch(withAccess, QuestKind.CHAT, prompt, { resume: true, record: !recorded, thread, request });
+  }
+
+  private hold(sessionKey: string, request: ChatRequestType, resumeAt: number, questId: string): void {
+    const existing = this.held.get(sessionKey);
+    this.held.set(sessionKey, {
+      creatureId: request.creatureId,
+      threadId: request.threadId,
+      resumeAt,
+      questId,
+      requests: [...(existing?.requests ?? []), request],
+    });
+    this.scheduleHeld();
+    this.emit();
+  }
+
+  private scheduleHeld(): void {
+    if (this.heldTimer) clearTimeout(this.heldTimer);
+    this.heldTimer = undefined;
+    if (this.held.size === 0) return;
+    const next = Math.min(...Array.from(this.held.values()).map((entry) => entry.resumeAt));
+    this.heldTimer = setTimeout(() => {
+      this.heldTimer = undefined;
+      const now = Date.now();
+      Array.from(this.held.entries())
+        .filter(([, entry]) => entry.resumeAt + RESET_GRACE_MS <= now)
+        .forEach(([key]) => this.releaseHeld(key));
+      this.scheduleHeld();
+    }, Math.max(0, next + RESET_GRACE_MS - Date.now()));
+  }
+
+  // Sends a session's held messages as one, the way queued messages go out.
+  private releaseHeld(sessionKey: string): void {
+    const entry = this.held.get(sessionKey);
+    if (!entry) return;
+    this.held.delete(sessionKey);
+    this.emit();
+    try {
+      const questId = this.chat({
+        creatureId: entry.creatureId,
+        threadId: entry.threadId,
+        text: entry.requests.map((request) => request.text).join('\n\n'),
+        attachments: entry.requests.flatMap((request) => request.attachments ?? []),
+      }, true);
+      this.quests.addEvent(questId, { kind: EventKind.SYSTEM, text: 'Sending your held message now.' });
+    } catch {
+      // The creature or thread is gone; nothing to send to.
+    }
+  }
+
+  sendHeldNow(creatureId: string, threadId?: string): void {
+    this.releaseHeld(threadKey(creatureId, threadId));
+    this.scheduleHeld();
+  }
+
+  cancelHeld(creatureId: string, threadId?: string): void {
+    const sessionKey = threadKey(creatureId, threadId);
+    const entry = this.held.get(sessionKey);
+    if (!entry) return;
+    this.held.delete(sessionKey);
+    this.quests.addEvent(entry.questId, { kind: EventKind.SYSTEM, text: 'Held message cancelled.' });
+    this.scheduleHeld();
+    this.emit();
   }
 
   private async ask(request: AskRequestType): Promise<string> {
@@ -546,6 +647,8 @@ export class Hq {
 
   clearThread(creatureId: string, threadId?: string): void {
     this.chatQueue.delete(threadKey(creatureId, threadId));
+    this.held.delete(threadKey(creatureId, threadId));
+    this.scheduleHeld();
     const removedIds = this.quests.clearThread(creatureId, threadId);
     removedIds.forEach((questId) => {
       this.running.get(questId)?.cancel();
@@ -722,6 +825,7 @@ export class Hq {
     this.stopWatching?.();
     if (this.authTimer) clearInterval(this.authTimer);
     if (this.updateTimer) clearInterval(this.updateTimer);
+    if (this.heldTimer) clearTimeout(this.heldTimer);
     this.lab.stopAll();
     this.approvals.stop();
   }
