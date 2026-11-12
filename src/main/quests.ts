@@ -127,6 +127,13 @@ export class QuestStore {
     return { at: last.endedAt ?? last.startedAt, contextTokens: withContext?.usage?.contextTokens };
   }
 
+  // Rough conversation size for engines that don't report it: what was sent and received so far.
+  sessionTokenEstimate(sessionId: string): number {
+    return this.quests
+      .filter((quest) => quest.sessionId === sessionId)
+      .reduce((sum, quest) => sum + (quest.usage ? quest.usage.inputTokens + quest.usage.outputTokens : 0), 0);
+  }
+
   // A short text recap of the last few exchanges in a session, to carry over into a fresh one.
   recap(sessionId: string, count = RECAP_EXCHANGES): string {
     const clip = (text: string, limit: number): string => {

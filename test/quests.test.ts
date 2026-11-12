@@ -42,4 +42,13 @@ describe('QuestStore session helpers', () => {
     expect(Date.now() - (activity?.at ?? 0)).toBeLessThan(5_000);
     expect(store.sessionActivity('missing')).toBeUndefined();
   });
+
+  it('estimates a session\'s size from what each reply sent and received', () => {
+    const first = chat('q1', 'a', 'agy:c1');
+    const second = chat('q2', 'b', 'agy:c1');
+    chat('other', 'c', 'agy:c2');
+    store.setUsage(first.id, { inputTokens: 6_000, outputTokens: 1_000, cacheReadTokens: 0, cacheWriteTokens: 0 });
+    store.setUsage(second.id, { inputTokens: 200, outputTokens: 800, cacheReadTokens: 0, cacheWriteTokens: 0 });
+    expect(store.sessionTokenEstimate('agy:c1')).toBe(8_000);
+  });
 });

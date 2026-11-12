@@ -287,14 +287,25 @@ export class Hq {
     let stored = options.resume ? this.quests.sessionFor(sessionKey) : undefined;
     let recapContext = '';
     const isCompact = /^\/compact\b/.test(prompt.trim());
-    if (stored && !isCompact && engine.adapter === EngineAdapter.CLAUDE && !stored.startsWith(AGY_SESSION_PREFIX) && this.isColdAndLarge(stored)) {
+    const hasSessions = engine.adapter === EngineAdapter.CLAUDE || engine.adapter === EngineAdapter.ANTIGRAVITY;
+    // Claude and Antigravity can't resume each other's sessions, so a creature that switched engines starts over.
+    const switched = !!stored && hasSessions && stored.startsWith(AGY_SESSION_PREFIX) !== (engine.adapter === EngineAdapter.ANTIGRAVITY);
+    const cold = !!stored && hasSessions && !switched && !isCompact && this.isColdAndLarge(stored);
+    if (stored && (switched || cold)) {
+      // Either way, carry the last few exchanges over so the creature doesn't start from nothing.
       const recap = this.quests.recap(stored);
       this.quests.clearSession(sessionKey);
       stored = undefined;
+      const why = switched ? 'was held by another engine' : 'was closed to save tokens (it was large and idle)';
       recapContext = recap
-        ? `This chat continues an earlier conversation that was closed to save tokens (it was large and idle). The last exchanges were:\n\n${recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`
+        ? `This chat continues an earlier conversation that ${why}. The last exchanges were:\n\n${recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`
         : '';
-      this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: 'Started a fresh session: the previous one was large and idle, so resuming it would have re-billed the whole conversation. A short recap was carried over.' });
+      this.quests.addEvent(quest.id, {
+        kind: EventKind.SYSTEM,
+        text: switched
+          ? 'Started a fresh session: this creature switched engines, and the old session can only be resumed by the engine that made it. A short recap was carried over.'
+          : 'Started a fresh session: the previous one was large and idle, so resuming it would have resent the whole conversation. A short recap was carried over.',
+      });
     }
     const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, [threadContext, recapContext].filter(Boolean).join('\n\n'));
     const agySession = stored?.startsWith(AGY_SESSION_PREFIX) ? stored.slice(AGY_SESSION_PREFIX.length) : undefined;
@@ -399,14 +410,18 @@ export class Hq {
     return quest.id;
   }
 
-  // Past the idle limit the prompt cache has expired, so resuming re-bills the whole conversation
-  // as a cache write. For a big session a fresh start with a recap is far cheaper.
+  // Past the idle limit Claude's prompt cache has expired, so resuming re-bills the whole conversation
+  // as a cache write. Antigravity never compacts, so a long idle chat there would also be resent in
+  // full. For a big session a fresh start with a recap is far cheaper.
   private isColdAndLarge(sessionId: string): boolean {
     const { idleResetMinutes, idleResetMinTokens } = this.profile.session;
     if (idleResetMinutes <= 0) return false;
     const activity = this.quests.sessionActivity(sessionId);
     if (!activity || Date.now() - activity.at < idleResetMinutes * 60_000) return false;
-    const size = activity.contextTokens ?? sessionContextFromLog(sessionId, this.profile.claudeConfigDir);
+    // Antigravity doesn't report token counts, so its size is the estimate kept per reply.
+    const size = sessionId.startsWith(AGY_SESSION_PREFIX)
+      ? this.quests.sessionTokenEstimate(sessionId)
+      : activity.contextTokens ?? sessionContextFromLog(sessionId, this.profile.claudeConfigDir);
     return (size ?? 0) >= idleResetMinTokens;
   }
 
