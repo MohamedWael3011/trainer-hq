@@ -38,6 +38,8 @@ import type {
 import { ApprovalBroker, type AskRequestType } from './approvals';
 import { attachmentDirs, detectPaths, inlineImages, installSkill, prepareAttachments } from './attachments';
 import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from './auth';
+import { googleCloudSignedIn } from './cloudAuth';
+import { GOOGLE_CLOUD_EXPIRED_NOTE, SIGN_IN_COMMAND, isSignInKind } from '@shared/signIn';
 import { checkForUpdate } from './updates';
 import { limitResetAt } from './limits';
 import { describeCommands } from './commands';
@@ -74,6 +76,10 @@ type HeldEntryType = {
 
 const clockLabel = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const DAYCARE_MODEL = 'haiku';
+const GOOGLE_CLOUD_TOOL = /\b(?:bq|gcloud)\b/;
+
+const usesGoogleCloud = (creature: CreatureType): boolean =>
+  [...creature.tools.allow, ...creature.tools.ask].some((rule) => GOOGLE_CLOUD_TOOL.test(rule));
 
 const STATE_THROTTLE_MS = 60;
 // Live typing and token counts update many times a second; ~10 frames a second reads as smooth.
@@ -291,6 +297,11 @@ export class Hq {
     const cwd = creature.cwd && existsSync(creature.cwd) ? creature.cwd : this.profile.vault;
     const quest = this.quests.create(creature.id, kind, options.recordText ?? prompt, cwd, options.parentId, options.askedBy, thread?.id);
     if (options.record) this.quests.addEvent(quest.id, { kind: EventKind.USER, text: options.recordText ?? prompt });
+    if (usesGoogleCloud(creature)) {
+      void googleCloudSignedIn(this.env()).then((signedIn) => {
+        if (!signedIn) this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: GOOGLE_CLOUD_EXPIRED_NOTE });
+      });
+    }
     const planUsage = this.currentUsage()?.fiveHour ?? 0;
     // The plan-usage guard is about the Claude plan; other engines have their own quotas.
     if (engine.adapter === EngineAdapter.CLAUDE && creature.autonomy === Autonomy.FULL_AUTO && planUsage >= this.profile.guard.fullAutoMaxPlanUsage) {
@@ -921,6 +932,11 @@ export class Hq {
     const dir = this.update?.sourceDir;
     if (!dir || !existsSync(join(dir, '.git'))) throw new Error('The source folder this app was built from is gone. Pull and run npm run install:app in your checkout.');
     runInTerminal(`cd ${JSON.stringify(dir)} && git pull --ff-only && npm install && npm run install:app`);
+  }
+
+  signIn(kind: unknown): void {
+    if (!isSignInKind(kind)) throw new Error('Unknown sign-in.');
+    runInTerminal(SIGN_IN_COMMAND[kind]);
   }
 
   stop(): void {

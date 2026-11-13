@@ -195,6 +195,7 @@ export const Ipc = {
   NOTCH_TOGGLE: 'notch:toggle',
   FOCUS_CREATURE: 'ui:focus-creature',
   OPEN_PATH: 'shell:open-path',
+  SIGN_IN: 'shell:sign-in',
   OPEN_LOCAL: 'shell:open-local',
   LOGIN_ITEM_GET: 'app:login-item-get',
   NOTCH_METRICS: 'notch:metrics',

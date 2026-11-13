@@ -79,6 +79,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string) => windows.openDashboard(creatureId));
   ipcMain.handle(Ipc.SURFACE_INTERACTIVE, (_event, surface: SurfaceType, interactive: boolean) => windows.setInteractive(surface, interactive));
   ipcMain.handle(Ipc.OPEN_PATH, (_event, target?: string) => shell.openPath(target ?? hq.vaultPath()));
+  ipcMain.handle(Ipc.SIGN_IN, (_event, kind: unknown) => hq.signIn(kind));
   ipcMain.handle(Ipc.OPEN_LOCAL, (_event, target: string, baseDir?: string) => openLocal(target, [baseDir, hq.vaultPath()].filter((dir): dir is string => !!dir)));
   ipcMain.handle(Ipc.LOGIN_ITEM_GET, () => app.getLoginItemSettings().openAtLogin);
   ipcMain.handle(Ipc.NOTCH_METRICS, () => windows.notchMetrics());

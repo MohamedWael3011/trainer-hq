@@ -1,4 +1,5 @@
 import type { AutonomyType, SurfaceType } from './constants';
+import type { SignInKindType } from './signIn';
 import type {
   DisplayInfoType,
   CommandInfoType,
@@ -86,6 +87,7 @@ export type HqApiType = {
   openDashboard: (creatureId?: string) => Promise<void>;
   setInteractive: (surface: SurfaceType, interactive: boolean) => Promise<void>;
   openPath: (target?: string) => Promise<string>;
+  signIn: (kind: SignInKindType) => Promise<void>;
   openLocal: (target: string, baseDir?: string) => Promise<{ ok: boolean; path?: string; revealed?: boolean; error?: string }>;
   getOpenAtLogin: () => Promise<boolean>;
   getNotchMetrics: () => Promise<NotchMetricsType>;

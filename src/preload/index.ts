@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { Ipc, type AutonomyType, type SurfaceType } from '@shared/constants';
 import type { HqApiType } from '@shared/api';
+import type { SignInKindType } from '@shared/signIn';
 import type {
   DisplayInfoType,
   CommandInfoType,
@@ -94,6 +95,7 @@ const api: HqApiType = {
   openDashboard: (creatureId?: string): Promise<void> => ipcRenderer.invoke(Ipc.OPEN_DASHBOARD, creatureId),
   setInteractive: (surface: SurfaceType, interactive: boolean): Promise<void> => ipcRenderer.invoke(Ipc.SURFACE_INTERACTIVE, surface, interactive),
   openPath: (target?: string): Promise<string> => ipcRenderer.invoke(Ipc.OPEN_PATH, target),
+  signIn: (kind: SignInKindType): Promise<void> => ipcRenderer.invoke(Ipc.SIGN_IN, kind),
   openLocal: (target: string, baseDir?: string) => ipcRenderer.invoke(Ipc.OPEN_LOCAL, target, baseDir),
   getOpenAtLogin: (): Promise<boolean> => ipcRenderer.invoke(Ipc.LOGIN_ITEM_GET),
   getNotchMetrics: (): Promise<NotchMetricsType> => ipcRenderer.invoke(Ipc.NOTCH_METRICS),

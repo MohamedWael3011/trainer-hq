@@ -7,6 +7,7 @@ import Markdown from '../Markdown/Markdown';
 import HandoffCard from '../HandoffCard/HandoffCard';
 import LiveStatus from '../LiveStatus/LiveStatus';
 import OutputFiles from '../OutputFiles/OutputFiles';
+import SignInButtons from '../SignInButtons/SignInButtons';
 import { useQuestLive } from '../../hooks/useQuestLive';
 import { firstSentence, parseCommand, useCommands } from '../../hooks/useCommands';
 import { renderIf } from '../../lib/renderIf';
@@ -114,12 +115,12 @@ const QuestLog = ({ state, quest }: PropsType) => {
         return child ? <HandoffCard key={index} state={state} quest={child} /> : <div key={index} className="ql-tool">{event.text}</div>;
       }
       if (event.kind === EventKind.TOOL) return <div key={index} className="ql-tool">{event.text}</div>;
-      if (event.kind === EventKind.ERROR) return <div key={index} className="ql-error selectable">{event.text}</div>;
-      if (event.kind === EventKind.SYSTEM) return <div key={index} className="ql-tool">{event.text}</div>;
+      if (event.kind === EventKind.ERROR) return <div key={index} className="ql-error selectable">{event.text}<SignInButtons text={event.text} /></div>;
+      if (event.kind === EventKind.SYSTEM) return <div key={index} className="ql-tool">{event.text}<SignInButtons text={event.text} /></div>;
       return (
         <div key={index} className="ql-bot">
           <Sprite state={state} id={quest.creatureId} className="ql-avatar" />
-          <div className="ql-bubble"><Markdown text={event.text} baseDir={quest.cwd} /></div>
+          <div className="ql-bubble"><Markdown text={event.text} baseDir={quest.cwd} /><SignInButtons text={event.text} /></div>
         </div>
       );
     })}
