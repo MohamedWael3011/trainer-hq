@@ -4,6 +4,8 @@ import { join } from 'path';
 import {
   AUTO_MODEL,
   Autonomy,
+  ScheduleCadence,
+  type ScheduleCadenceType,
   ContextOption,
   MAX_HANDOFF_DEPTH,
   DaycareAction,
@@ -43,7 +45,7 @@ import type {
   SessionAdoptRequestType,
   TerminalSessionType,
 } from '@shared/types';
-import { ApprovalBroker, type AskRequestType } from './approvals';
+import { ApprovalBroker, type AskRequestType, type ScheduleToolRequestType } from './approvals';
 import { attachmentDirs, detectPaths, inlineImages, installSkill, prepareAttachments } from './attachments';
 import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from './auth';
 import { googleCloudSignedIn } from './cloudAuth';
@@ -57,11 +59,11 @@ import { brainFiles, buildSystemPrompt, inlinedNotePaths } from './brain';
 import { downscaleImage } from './images';
 import { BUDGET_DAYS, UsageLedger } from './ledger';
 import { NoteReadLog } from './noteReads';
-import { resolveModel } from './routing';
+import { isLightModel, resolveModel } from './routing';
 import { ScheduleStore } from './schedules';
 import { scanTerminalSessions, terminalSessionRecap } from './sessionWatch';
 import { listTemplates, seedTemplates } from './templates';
-import { addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
+import { INTERRUPTED_RESUME_MAX_TOKENS, addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
 import { approveNote, buildProposalPrompt, dismissNote, inlineProposals, listDaycare, parseProposals, worthReviewing, writeProposals, type ProposalType } from './daycare';
 import { runClaude } from './engines/claude';
 import { runCli } from './engines/cli';
@@ -86,6 +88,9 @@ const SESSION_WATCH_MS = 60_000;
 const SCHEDULE_TICK_MS = 30_000;
 const DEFAULT_COLD_MINUTES = 60;
 const TOKENS_PER_K = 1000;
+const AGY_RESET_MIN_TOKENS = 40_000;
+const BASH_OUTPUT_CHARS = '16000';
+const SCHEDULE_TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 export type NudgeType = {
   title: string;
@@ -185,6 +190,7 @@ export class Hq {
     (questId) => this.quests.get(questId)?.creatureId,
     () => this.onApprovalsChanged(),
     (request) => this.ask(request),
+    (request) => this.scheduleFromCreature(request),
   );
   private depth = new Map<string, number>();
 
@@ -330,10 +336,11 @@ export class Hq {
     return creature;
   }
 
-  private env(artifacts = true): NodeJS.ProcessEnv {
+  private env(artifacts = true, helperModel = ''): NodeJS.ProcessEnv {
     // Headless Claude Code leaves out the Artifact tools unless this is set. Set it to 0 under
     // env: in profile.yaml to turn them off.
-    const env: NodeJS.ProcessEnv = { CLAUDE_CODE_ARTIFACT: '1', ...process.env, ...this.profile.env };
+    const helpers: NodeJS.ProcessEnv = helperModel ? { CLAUDE_CODE_SUBAGENT_MODEL: helperModel, CLAUDE_CODE_SUBAGENT_MODEL_FORCE: '1' } : {};
+    const env: NodeJS.ProcessEnv = { CLAUDE_CODE_ARTIFACT: '1', BASH_MAX_OUTPUT_LENGTH: BASH_OUTPUT_CHARS, ...helpers, ...process.env, ...this.profile.env };
     if (!artifacts) delete env.CLAUDE_CODE_ARTIFACT;
     delete env.ELECTRON_RUN_AS_NODE;
     if (this.profile.claudeConfigDir) env.CLAUDE_CONFIG_DIR = this.profile.claudeConfigDir;
@@ -484,7 +491,7 @@ export class Hq {
         },
       });
       if (!claudeSession && !isCompact) this.quests.markFreshSession(quest.id);
-      handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(context.artifacts), timeoutMs: plan.timeoutMs, callbacks });
+      handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(context.artifacts, isLightModel(creature.model) ? '' : this.profile.session.lightModel), timeoutMs: plan.timeoutMs, callbacks });
     } else if (engine.adapter === EngineAdapter.ANTIGRAVITY) {
       const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
       const args = planAntigravityArgs({ autonomy: creature.autonomy, model: creature.model, addDirs: [creature.dir, ...creature.addDirs], conversationId: agySession });
@@ -579,7 +586,9 @@ export class Hq {
     const size = sessionId.startsWith(AGY_SESSION_PREFIX)
       ? this.quests.sessionTokenEstimate(sessionId)
       : activity.contextTokens ?? sessionContextFromLog(sessionId, this.profile.claudeConfigDir);
-    return (size ?? 0) >= idleResetMinTokens;
+    if (sessionId.startsWith(AGY_SESSION_PREFIX)) return (size ?? 0) >= Math.min(idleResetMinTokens, AGY_RESET_MIN_TOKENS);
+    const limit = this.quests.sessionInterrupted(sessionId) ? Math.max(idleResetMinTokens, INTERRUPTED_RESUME_MAX_TOKENS) : idleResetMinTokens;
+    return (size ?? 0) >= limit;
   }
 
   // `recorded`: the message is already in the chat log (a held message being sent again).
@@ -1009,6 +1018,29 @@ export class Hq {
     if (!schedule) throw new Error('That recurring quest no longer exists.');
     this.schedules.markRan(id);
     this.fireSchedule(schedule);
+  }
+
+  private scheduleFromCreature(request: ScheduleToolRequestType): string {
+    const quest = this.quests.get(request.questId);
+    if (!quest) throw new Error('The asking quest is no longer running.');
+    const cadences = Object.values(ScheduleCadence) as string[];
+    if (!request.cadence || !cadences.includes(request.cadence)) throw new Error(`cadence must be one of ${cadences.join(', ')}.`);
+    const time = String(request.time ?? '').match(SCHEDULE_TIME);
+    if (!time) throw new Error('time must be HH:MM in 24-hour local time, for example 00:00.');
+    const id = this.schedules.save({
+      creatureId: quest.creatureId,
+      threadId: quest.threadId,
+      prompt: String(request.prompt ?? ''),
+      cadence: request.cadence as ScheduleCadenceType,
+      hour: Number(time[1]),
+      minute: Number(time[2]),
+      weekday: Number(request.weekday ?? 0),
+      enabled: true,
+    });
+    const next = this.schedules.get(id)?.nextRunAt ?? Date.now();
+    this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: `Recurring quest created (${request.cadence}, ${time[0]}). Pause or delete it in the Quests tab.` });
+    this.emit();
+    return `Scheduled. First run: ${new Date(next).toLocaleString()}. It runs in this chat while Trainer HQ is open; the user can pause or delete it in the Quests tab.`;
   }
 
   private runDueSchedules(): void {

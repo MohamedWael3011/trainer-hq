@@ -31,7 +31,7 @@ guard:
 session:
   autocompact: 200000     # compact once the conversation reaches this size (100000-1000000, or auto)
   idleResetMinutes: 60    # after this long idle the prompt cache is cold: start fresh with a short recap instead (0 = never)
-  idleResetMinTokens: 40000  # only reset sessions at least this big
+  idleResetMinTokens: 120000 # only reset sessions at least this big (a fresh session costs 35-60k by itself)
   lightModel: sonnet      # creatures answering a teammate, and short lookups on the Auto model, run on this ('' = off)
 
 # Watches your own Claude Code terminal sessions and nudges you when one gets expensive.

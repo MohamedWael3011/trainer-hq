@@ -5,8 +5,8 @@ import type { QuestLiveType, QuestUsageType } from '@shared/types';
 import { summarizeToolInput } from '../approvals';
 import type { InlineImageType, RunCallbacksType, RunHandleType, RunOutcomeType } from './types';
 import { claudeFlagSupport } from './claudeFlags';
+import { isUsageLimitText } from '../limits';
 
-const USAGE_LIMIT_PATTERN = /usage limit|rate limit|limit reached|reset at/i;
 const STDERR_KEEP = 4000;
 
 const StreamType = {
@@ -301,7 +301,7 @@ export const runClaude = (options: {
         ok: !spawnError && code === 0 && !resultError && !cancelled && !timedOut && !compactLoop,
         resultText,
         error: errorText,
-        usageLimited: USAGE_LIMIT_PATTERN.test(`${resultText}\n${stderr}`) && (resultError || code !== 0),
+        usageLimited: isUsageLimitText(`${resultText}\n${stderr}`) && (resultError || code !== 0),
         cancelled,
         timedOut,
         usage: questUsage,

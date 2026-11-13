@@ -1,7 +1,7 @@
 import { closeSync, existsSync, openSync, readSync, readdirSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
-import { ASK_TOOL, Autonomy, MCP_SERVER_NAME, PERMISSION_TOOL, PermissionMode } from '@shared/constants';
+import { ASK_TOOL, Autonomy, MCP_SERVER_NAME, PERMISSION_TOOL, PermissionMode, SCHEDULE_TOOL } from '@shared/constants';
 import type { CreatureType } from '@shared/types';
 import { autocompactWindow, type ProfileConfigType } from './config';
 import { pushIfSupported, type FlagSupportType } from './engines/claudeFlags';
@@ -196,7 +196,7 @@ export const planClaudeRun = (options: {
     args.push('--worktree', `thq-${creature.id}-${questId.slice(0, 8)}`);
   }
   if (fullAuto && profile.guard.fullAutoMaxBudgetUsd) pushIfSupported(args, supports, '--max-budget-usd', String(profile.guard.fullAutoMaxBudgetUsd));
-  args.push('--allowedTools', ...allow, `mcp__${MCP_SERVER_NAME}__${ASK_TOOL}`);
+  args.push('--allowedTools', ...allow, `mcp__${MCP_SERVER_NAME}__${ASK_TOOL}`, `mcp__${MCP_SERVER_NAME}__${SCHEDULE_TOOL}`);
   if (deny.length > 0) args.push('--disallowedTools', ...deny);
   if (ask.length > 0) pushIfSupported(args, supports, SETTINGS_FLAG, JSON.stringify({ permissions: { ask } }));
   return {

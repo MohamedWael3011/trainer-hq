@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { limitResetAt } from '../src/main/limits';
+import { isUsageLimitText, limitResetAt } from '../src/main/limits';
 
 const at = (hours: number, minutes = 0, dayOffset = 0): number => {
   const date = new Date(2026, 10, 12 + dayOffset);
@@ -36,5 +36,15 @@ describe('limitResetAt', () => {
 
   it('gives up when nothing says when', () => {
     expect(limitResetAt(undefined, 'usage limit reached', now)).toBeUndefined();
+  });
+});
+
+describe('isUsageLimitText', () => {
+  it('recognises every wording the CLI has used for a plan limit', () => {
+    expect(isUsageLimitText("You've hit your 5-hour limit · resets 8:10pm (Africa/Cairo)")).toBe(true);
+    expect(isUsageLimitText("You've hit your limit · resets 3pm")).toBe(true);
+    expect(isUsageLimitText("You've hit your weekly limit · resets Mon 9am")).toBe(true);
+    expect(isUsageLimitText('Claude AI usage limit reached|1731430800')).toBe(true);
+    expect(isUsageLimitText('The file exceeds the size limit of 256 KB')).toBe(false);
   });
 });

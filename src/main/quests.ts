@@ -17,7 +17,11 @@ const MS_PER_DAY = 86_400_000;
 const RECAP_EXCHANGES = 3;
 const RECAP_ASK_CHARS = 500;
 const RECAP_ANSWER_CHARS = 1_500;
+const RECAP_STEPS = 12;
+const RECAP_STEP_CHARS = 160;
+const RECAP_OUTPUTS = 8;
 const LIVE = new Set<QuestStatusType>([QuestStatus.RUNNING, QuestStatus.WAITING]);
+const INTERRUPTED = new Set<QuestStatusType>([QuestStatus.FAILED, QuestStatus.PAUSED, QuestStatus.CANCELLED]);
 
 const readJson = <T>(file: string, fallback: T): T => {
   try {
@@ -138,6 +142,11 @@ export class QuestStore {
     return { at: last.endedAt ?? last.startedAt, contextTokens: withContext?.usage?.contextTokens, model: withModel?.usage?.model };
   }
 
+  sessionInterrupted(sessionId: string): boolean {
+    const last = this.quests.find((quest) => quest.sessionId === sessionId);
+    return !!last && INTERRUPTED.has(last.status);
+  }
+
   sessionFloor(creatureId: string): number | undefined {
     return this.quests.find((quest) => quest.creatureId === creatureId && quest.freshSession && quest.usage?.baseTokens)?.usage?.baseTokens;
   }
@@ -162,7 +171,16 @@ export class QuestStore {
       .map((quest) => {
         const asked = quest.events.find((event) => event.kind === EventKind.USER)?.text ?? quest.title;
         const answer = [...quest.events].reverse().find((event) => event.kind === EventKind.RESULT || event.kind === EventKind.TEXT)?.text ?? '(no answer recorded)';
-        return `User: ${clip(asked, RECAP_ASK_CHARS)}\nYou: ${clip(answer, RECAP_ANSWER_CHARS)}`;
+        if (!INTERRUPTED.has(quest.status)) return `User: ${clip(asked, RECAP_ASK_CHARS)}\nYou: ${clip(answer, RECAP_ANSWER_CHARS)}`;
+        const steps = quest.events.filter((event) => event.kind === EventKind.TOOL).slice(-RECAP_STEPS).map((event) => `- ${clip(event.text, RECAP_STEP_CHARS)}`);
+        const outputs = quest.events.filter((event) => event.kind === EventKind.OUTPUT).slice(-RECAP_OUTPUTS).map((event) => `- ${event.text}`);
+        const stopped = [...quest.events].reverse().find((event) => event.kind === EventKind.ERROR)?.text;
+        return [
+          `User: ${clip(asked, RECAP_ASK_CHARS)}`,
+          `You were interrupted before finishing${stopped ? ` (${clip(stopped, RECAP_STEP_CHARS)})` : ''}. The last thing you said: ${clip(answer, RECAP_ANSWER_CHARS)}`,
+          steps.length > 0 ? `Your last steps, oldest first (files you wrote are still on disk; reuse them instead of redoing the work):\n${steps.join('\n')}` : '',
+          outputs.length > 0 ? `Files you produced:\n${outputs.join('\n')}` : '',
+        ].filter(Boolean).join('\n');
       })
       .join('\n\n');
   }

@@ -282,6 +282,7 @@ export const SPRITE_ALIASES: Record<string, string> = { dozer: 'hampotamos', egg
 export const MCP_SERVER_NAME = 'thq';
 export const PERMISSION_TOOL = 'approve';
 export const ASK_TOOL = 'ask_creature';
+export const SCHEDULE_TOOL = 'schedule_quest';
 export const MAX_HANDOFF_DEPTH = 2;
 export const NOTCH_SHORTCUT = 'Alt+Space';
 export const DOCK_SHORTCUT = 'Alt+Shift+Space';

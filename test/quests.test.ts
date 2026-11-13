@@ -28,6 +28,23 @@ describe('QuestStore session helpers', () => {
     expect(store.recap('s1')).toBe('User: one\nYou: first answer\n\nUser: two\nYou: second answer');
   });
 
+  it('carries the steps and files of an interrupted run into the recap', () => {
+    const quest = chat('update the dashboard', 'Queries are done, building the page.', 's1');
+    store.addEvent(quest.id, { kind: 'tool', text: 'Bash bq query --project_id=x "SELECT 1"' });
+    store.addEvent(quest.id, { kind: 'tool', text: 'Write /tmp/dash/summary.json' });
+    store.addEvent(quest.id, { kind: 'output', text: '/tmp/dash/summary.json' });
+    store.addEvent(quest.id, { kind: 'error', text: "You've hit your 5-hour limit · resets 8:10pm" });
+    store.setStatus(quest.id, 'failed');
+    const recap = store.recap('s1');
+    expect(recap).toContain('You were interrupted before finishing (You\'ve hit your 5-hour limit · resets 8:10pm). The last thing you said: Queries are done, building the page.');
+    expect(recap).toContain('- Write /tmp/dash/summary.json');
+    expect(recap).toContain('Files you produced:\n- /tmp/dash/summary.json');
+    expect(store.sessionInterrupted('s1')).toBe(true);
+    const next = chat('continue', 'Done.', 's1');
+    store.setStatus(next.id, 'done');
+    expect(store.sessionInterrupted('s1')).toBe(false);
+  });
+
   it('keeps the recap short', () => {
     chat('q', 'x'.repeat(5_000), 's1');
     expect(store.recap('s1').length).toBeLessThan(2_200);

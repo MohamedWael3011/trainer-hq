@@ -174,6 +174,9 @@ export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfig
     usesClaudeCode
       ? 'For broad searches across many files, or reading long docs, PDFs or logs, hand the reading to a helper agent (the Agent tool, e.g. Explore) and work from its summary: it reads in its own context, so yours stays small.'
       : '',
+    usesClaudeCode
+      ? 'When the user wants something to repeat (a daily refresh, a weekly report), create it with the schedule_quest tool so Trainer HQ runs it. Session crons, loops and sleeps end with your reply and never fire.'
+      : '',
     profile.daycareMode === DaycareMode.FREE
       ? `If this chat taught you something durable and non-obvious about the user's work (a gotcha, contract, decision, file location or convention), end your answer with a line "${REMEMBER_HEADING}" followed by 1-3 short "- " bullets. Leave it out when there's nothing new.`
       : '',

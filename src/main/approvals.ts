@@ -21,11 +21,20 @@ const SUMMARY_LIMIT = 240;
 const AUTH_HEADER = 'x-thq-token';
 const ROUTE = '/approve';
 const ASK_ROUTE = '/ask';
+const SCHEDULE_ROUTE = '/schedule';
 
 export type AskRequestType = {
   questId: string;
   creature: string;
   question: string;
+};
+
+export type ScheduleToolRequestType = {
+  questId: string;
+  prompt?: string;
+  cadence?: string;
+  time?: string;
+  weekday?: number;
 };
 
 const readBody = (req: IncomingMessage): Promise<string> =>
@@ -65,6 +74,7 @@ export class ApprovalBroker {
     private readonly creatureForQuest: (questId: string) => string | undefined,
     private readonly onChange: () => void,
     private readonly onAsk: (request: AskRequestType) => Promise<string>,
+    private readonly onSchedule: (request: ScheduleToolRequestType) => string = () => 'Scheduling is not available.',
   ) {}
 
   start(): Promise<void> {
@@ -79,6 +89,15 @@ export class ApprovalBroker {
           res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answer }));
         } catch (error) {
           res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answer: `Could not ask: ${(error as Error).message}` }));
+        }
+        return;
+      }
+      if (req.url === SCHEDULE_ROUTE) {
+        try {
+          const answer = this.onSchedule(JSON.parse(await readBody(req)) as ScheduleToolRequestType);
+          res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answer }));
+        } catch (error) {
+          res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ answer: `Could not schedule: ${(error as Error).message}` }));
         }
         return;
       }

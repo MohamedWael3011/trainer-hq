@@ -1,6 +1,9 @@
 import type { UsageType } from '@shared/types';
 
 const HOUR_MS = 3_600_000;
+const USAGE_LIMIT_PATTERN = /usage limit|rate limit|limit reached|reset at|hit your (?:[\w-]+ )*limit|limit\s*·\s*resets/i;
+
+export const isUsageLimitText = (text: string): boolean => USAGE_LIMIT_PATTERN.test(text);
 const DAY_MS = 24 * HOUR_MS;
 // Older CLIs end the error with the reset as epoch seconds: "Claude AI usage limit reached|1731430800".
 const EPOCH_PATTERN = /\|(\d{10})\b/;

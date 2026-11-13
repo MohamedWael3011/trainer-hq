@@ -68,10 +68,10 @@ A short onboarding checks your tools, sets up your vault and repos, and introduc
 | **Engines, models & cost** | Claude Code and Antigravity (`agy`) with model & effort pickers, plan-use labels, and per-reply token/cache/cost badges under every quest; any other CLI agent plugs in through a generic adapter. |
 | **Attachments** | Drop or paste files: their paths go into the message, zips are unpacked, and skill zips install in one click. |
 | **Usage and budgets** | The Trainer tab shows tokens, cache share, cost, compactions and cold restarts per creature for the last 30 days. Give a creature a weekly budget in the Dex and new quests pause once it is spent. |
-| **Lean sessions** | Each creature loads only what it uses: Artifacts, the skills listing and connectors are switches in the Dex (about 13k, 5k and 4k tokens per session). A chat that keeps auto-compacting without freeing much is stopped instead of paying to summarize in a loop. |
+| **Lean sessions** | Each creature loads only what it uses: Artifacts, the skills listing and connectors are switches in the Dex (about 13k, 5k and 4k tokens per session). A chat that keeps auto-compacting without freeing much is stopped instead of paying to summarize in a loop. Helper agents run on `session.lightModel` instead of Opus, and command output is capped at 16k characters per call (`BASH_MAX_OUTPUT_LENGTH` under `env:` changes it). |
 | **Auto model** | Pick **Auto** as a creature's model and short lookups run on Sonnet while real work stays on your default. Creatures answering a teammate always use the light model. |
 | **Terminal session watch** | Your own Claude Code terminal sessions show up in the Trainer tab once they get large. A notification tells you when one passes 300k tokens or goes cold, and **Adopt** turns it into a creature thread that starts fresh with a short recap. |
-| **Recurring quests** | Ask a creature the same thing every hour, day, weekday or week from the Quests tab. |
+| **Recurring quests** | Ask a creature the same thing every hour, day, weekday or week from the Quests tab, or just tell the creature to do something daily: it creates the recurring quest itself with its `schedule_quest` tool. |
 | **Quest templates** | Markdown files in your vault's `templates/` folder show up when you type `/` in a chat and fill the composer with their prompt. |
 | **Brain hygiene** | The Dex lists every brain note with its size, how often the creature has read it and when, and flags notes that are large, stale or never read. |
 | **Profiles** | One vault per profile (work, personal…), each optionally with its own Claude account. |
@@ -229,7 +229,7 @@ Each creature has a **Main** thread and as many extra threads as you like (**+ T
 Every step Claude takes (each file read, search or edit) resends the whole conversation so far, so the cost of a chat grows with its length, not with how short your message is. Trainer HQ leans on Claude Code's own mechanisms to keep that in check:
 
 - **Auto-compact at 200k** (`--autocompact`). Claude Code summarizes the chat a little before it reaches that size, so each step resends well under 200k instead of the chat growing toward the 1M window. A creature with a large brain, many tools or loaded skills can start a chat at 50k or more, and a lower limit leaves it too little room: it compacts every few steps and re-reads the same files each time.
-- **Fresh start after a break.** Claude Code's prompt cache lasts about an hour. Resuming a big chat after that re-bills the whole conversation at a higher rate. So when a chat has been idle over an hour and is above 40k tokens, the next message starts a new session with a short recap of the last few exchanges. The chat shows a note when this happens. This also applies to Antigravity creatures, which never compact. Antigravity doesn't report token counts, so their size is estimated from the text sent and received; that estimate leaves out what its tools read, so it errs low.
+- **Fresh start after a break.** Claude Code's prompt cache lasts about an hour. Resuming a big chat after that re-bills the whole conversation at a higher rate. So when a chat has been idle over an hour and is above 120k tokens, the next message starts a new session with a short recap of the last few exchanges. Smaller chats resume as they are, because a new session costs 35-60k tokens by itself. A run that was cut off (plan limit, error, stop) resumes its session up to 300k tokens, so it carries on instead of redoing the work; past that, the recap lists its last steps and the files it wrote. The chat shows a note when this happens. This also applies to Antigravity creatures, which never compact. Antigravity doesn't report token counts, so their size is estimated from the text sent and received; that estimate leaves out what its tools read, so it errs low.
 - **Switching engines keeps the thread.** Claude and Antigravity can't resume each other's sessions, so after a creature switches engines its next message starts a fresh session with the same recap, not from nothing.
 - **Frozen prompt per session.** Claude Code records the system prompt once per conversation, so brain edits never invalidate the cache mid-chat. They apply from the next fresh session or compaction.
 - **Shared cache across creatures** (`--exclude-dynamic-system-prompt-sections`). Per-folder details move out of the system prompt so fresh sessions reuse more of the cached prefix.
@@ -301,7 +301,7 @@ guard:
 session:                              # see "Keeping token use low"
   autocompact: 200000                 # 100000-1000000, or auto (Claude Code's default)
   idleResetMinutes: 60                # 0 = always resume, however long the chat sat idle
-  idleResetMinTokens: 40000
+  idleResetMinTokens: 120000          # smaller chats resume as they are; an interrupted run resumes up to 300k
   fallbackModel: sonnet               # retry on this when Opus/Fable is overloaded ('' = off)
   lightModel: sonnet                  # teammate answers and Auto-model lookups run on this ('' = off)
 

@@ -6,6 +6,7 @@ const TOKEN = process.env.THQ_TOKEN || '';
 const QUEST = process.env.THQ_QUEST || '';
 const TOOL_NAME = 'approve';
 const ASK_TOOL = 'ask_creature';
+const SCHEDULE_TOOL = 'schedule_quest';
 const METHOD_NOT_FOUND = -32601;
 
 const send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`);
@@ -43,6 +44,9 @@ const askHost = (toolName, input) =>
 const askCreature = (creature, question) =>
   post('/ask', { creature, question }, { answer: 'Trainer HQ is not reachable.' });
 
+const scheduleQuest = (input) =>
+  post('/schedule', { prompt: input.prompt, cadence: input.cadence, time: input.time, weekday: input.weekday }, { answer: 'Trainer HQ is not reachable.' });
+
 const tools = [
   {
     name: TOOL_NAME,
@@ -69,6 +73,20 @@ const tools = [
       required: ['creature', 'question'],
     },
   },
+  {
+    name: SCHEDULE_TOOL,
+    description: 'Create a recurring quest in Trainer HQ: the app sends you the prompt on a schedule, in this same chat, and the user can pause or delete it in the Quests tab. Use this for anything that should repeat (a daily refresh, a weekly report). Session crons, loops and background sleeps stop when your reply ends, so they never fire.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'The full instruction to run each time, with links and context. It must make sense on its own.' },
+        cadence: { type: 'string', enum: ['hourly', 'daily', 'weekdays', 'weekly'] },
+        time: { type: 'string', description: 'Local 24-hour time HH:MM, for example 00:00. Hourly uses only the minutes.' },
+        weekday: { type: 'number', description: 'For weekly: 0 is Sunday, 6 is Saturday.' },
+      },
+      required: ['prompt', 'cadence', 'time'],
+    },
+  },
 ];
 
 const handle = async (message) => {
@@ -93,6 +111,11 @@ const handle = async (message) => {
     const args = (params && params.arguments) || {};
     if (params && params.name === ASK_TOOL) {
       const reply = await askCreature(String(args.creature || ''), String(args.question || ''));
+      send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: String(reply.answer || '') }] } });
+      return;
+    }
+    if (params && params.name === SCHEDULE_TOOL) {
+      const reply = await scheduleQuest(args);
       send({ jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: String(reply.answer || '') }] } });
       return;
     }
