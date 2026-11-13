@@ -107,7 +107,8 @@ const Lab = ({ auditorId, auditorName, onAudit }: PropsType) => {
           {renderIf(!!workspace, workspace ? (
             <div className="lab-meta">
               <Badge>{workspace.ref || 'ref?'} · {workspace.commit}</Badge>
-              <Badge tone={workspace.ready ? BadgeTone.DONE : BadgeTone.WAIT}>{workspace.ready ? 'ready' : 'building'}</Badge>
+              {renderIf(workspace.slim, <Badge>space freed · shots kept</Badge>)}
+              {renderIf(!workspace.slim, <Badge tone={workspace.ready ? BadgeTone.DONE : BadgeTone.WAIT}>{workspace.ready ? 'ready' : 'building'}</Badge>)}
               <Badge tone={workspace.server.running ? BadgeTone.RUN : BadgeTone.NEUTRAL} dot>{workspace.server.running ? `server :${workspace.server.port}` : 'server stopped'}</Badge>
             </div>
           ) : null)}
@@ -116,6 +117,7 @@ const Lab = ({ auditorId, auditorName, onAudit }: PropsType) => {
               {renderIf(!workspace.server.running, <button className="btn primary sm" disabled={!workspace.ready} onClick={() => void act(() => window.hq.labStartServer(workspace.id))}>Start server</button>)}
               {renderIf(workspace.server.running, <button className="btn sm" onClick={() => void act(() => window.hq.labStopServer(workspace.id))}>Stop server</button>)}
               <button className="btn sm ghost" onClick={() => void window.hq.openPath(workspace.path)}>Open folder</button>
+              {renderIf(!workspace.slim && !workspace.inUse, <button className="btn sm ghost" title="Deletes the app copy (about 3 GB) and keeps shots, scenarios and findings" onClick={() => void act(() => window.hq.labFreeSpace(workspace.id))}>Free space</button>)}
             </div>
           ) : null)}
           <details className="lab-new">

@@ -89,6 +89,7 @@ const api: HqApiType = {
   labCreate: (topic: string, ref: string): Promise<string> => ipcRenderer.invoke(Ipc.LAB_CREATE, topic, ref),
   labImport: (workspaceId: string, flow: string): Promise<string> => ipcRenderer.invoke(Ipc.LAB_IMPORT, workspaceId, flow),
   labCancel: (jobId: string): Promise<void> => ipcRenderer.invoke(Ipc.LAB_CANCEL, jobId),
+  labFreeSpace: (workspaceId: string): Promise<void> => ipcRenderer.invoke(Ipc.LAB_FREE_SPACE, workspaceId),
   openLogin: (): Promise<void> => ipcRenderer.invoke(Ipc.AUTH_LOGIN),
   openDashboard: (creatureId?: string): Promise<void> => ipcRenderer.invoke(Ipc.OPEN_DASHBOARD, creatureId),
   setInteractive: (surface: SurfaceType, interactive: boolean): Promise<void> => ipcRenderer.invoke(Ipc.SURFACE_INTERACTIVE, surface, interactive),

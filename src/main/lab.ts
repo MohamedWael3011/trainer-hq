@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'fs';
 import { join, relative, resolve, sep } from 'path';
 import { randomUUID } from 'crypto';
 import { LabJobKind, LabJobStatus, type LabJobKindType } from '@shared/constants';
@@ -7,6 +7,12 @@ import type { LabJobType, LabRunType, LabShootRequestType, LabStateType, LabWork
 import type { LabConfigType } from './config';
 
 const KEEP_LINES = 40;
+const KEEP_FULL_WORKSPACES = 2;
+const IDLE_BEFORE_SLIM_MS = 6 * 60 * 60 * 1000;
+const PRUNE_EVERY_MS = 60 * 60 * 1000;
+const APP_DIR = 'app';
+const HARNESS_DIR = join(APP_DIR, 'harness');
+const SERVER_PID = /^\.devserver\.\d+\.pid$/;
 const MAX_RUNS = 12;
 const MAX_SHOTS = 400;
 const SHOT_PREFIX = 'shots-';
@@ -46,9 +52,29 @@ const listPngs = (dir: string, base: string, out: string[]): void => {
   }
 };
 
+const mtime = (path: string): number => {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return 0;
+  }
+};
+
+const entries = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir).map((name) => join(dir, name)) : []);
+
+const lastUsed = (dir: string): number =>
+  Math.max(mtime(dir), ...entries(dir).map(mtime), ...entries(join(dir, HARNESS_DIR)).map(mtime));
+
+const liveServerPids = (dir: string): number[] =>
+  entries(join(dir, HARNESS_DIR))
+    .filter((file) => SERVER_PID.test(file.slice(file.lastIndexOf(sep) + 1)))
+    .map((file) => Number(readText(file)))
+    .filter((pid) => pid > 0 && isAlive(pid));
+
 export class Lab {
   private jobs: LabJobType[] = [];
   private processes = new Map<string, ChildProcess>();
+  private pruneTimer: NodeJS.Timeout | undefined;
 
   constructor(
     private readonly settings: () => { config?: LabConfigType; env: Record<string, string> },
@@ -110,6 +136,8 @@ export class Lab {
           commit: readText(join(dir, config.markerFile)) ?? '',
           ref: readText(join(dir, config.refFile)) ?? '',
           ready: existsSync(join(dir, config.serverScript)) && existsSync(join(dir, config.readyPath)),
+          slim: !existsSync(join(dir, APP_DIR)),
+          inUse: this.inUse(dir, relative(home, dir)),
           flows,
           server: { running: !!pid, port: config.port, pid },
           runs: this.runs(dir),
@@ -136,6 +164,7 @@ export class Lab {
       this.processes.delete(job.id);
       job.status = code === 0 ? LabJobStatus.DONE : LabJobStatus.FAILED;
       job.endedAt = Date.now();
+      this.tryPrune();
       this.onChange();
     });
     child.on('error', (error) => {
@@ -156,7 +185,52 @@ export class Lab {
     const dir = this.workspace(workspaceId);
     const pid = this.serverPid(dir, this.config().port);
     if (pid) process.kill(pid);
+    this.tryPrune();
     this.onChange();
+  }
+
+  private inUse(dir: string, id: string): boolean {
+    return liveServerPids(dir).length > 0 || this.jobs.some((job) => job.workspaceId === id && job.status === LabJobStatus.RUNNING);
+  }
+
+  freeSpace(workspaceId: string): void {
+    const dir = this.workspace(workspaceId);
+    if (this.inUse(dir, workspaceId)) throw new Error(`Workspace "${workspaceId}" is in use. Stop its server and jobs first.`);
+    rmSync(join(dir, APP_DIR), { recursive: true, force: true });
+    this.onChange();
+  }
+
+  pruneOld(): string[] {
+    const config = this.settings().config;
+    if (!config || !existsSync(config.home)) return [];
+    const now = Date.now();
+    const slimmed = readdirSync(config.home)
+      .map((name) => join(config.home, name))
+      .filter((dir) => statSync(dir).isDirectory() && existsSync(join(dir, config.markerFile)) && existsSync(join(dir, APP_DIR)))
+      .map((dir) => ({ dir, id: relative(config.home, dir), used: lastUsed(dir) }))
+      .sort((a, b) => b.used - a.used)
+      .slice(KEEP_FULL_WORKSPACES)
+      .filter((entry) => now - entry.used > IDLE_BEFORE_SLIM_MS && !this.inUse(entry.dir, entry.id))
+      .map((entry) => {
+        rmSync(join(entry.dir, APP_DIR), { recursive: true, force: true });
+        return entry.id;
+      });
+    if (slimmed.length > 0) this.onChange();
+    return slimmed;
+  }
+
+  private tryPrune(): void {
+    try {
+      this.pruneOld();
+    } catch {
+      return;
+    }
+  }
+
+  startAutoPrune(): void {
+    if (this.pruneTimer) clearInterval(this.pruneTimer);
+    this.tryPrune();
+    this.pruneTimer = setInterval(() => this.tryPrune(), PRUNE_EVERY_MS);
   }
 
   shoot(request: LabShootRequestType): string {
@@ -211,6 +285,7 @@ export class Lab {
   }
 
   stopAll(): void {
+    if (this.pruneTimer) clearInterval(this.pruneTimer);
     this.processes.forEach((child) => child.kill('SIGTERM'));
   }
 }

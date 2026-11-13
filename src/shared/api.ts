@@ -81,6 +81,7 @@ export type HqApiType = {
   labCreate: (topic: string, ref: string) => Promise<string>;
   labImport: (workspaceId: string, flow: string) => Promise<string>;
   labCancel: (jobId: string) => Promise<void>;
+  labFreeSpace: (workspaceId: string) => Promise<void>;
   openLogin: () => Promise<void>;
   openDashboard: (creatureId?: string) => Promise<void>;
   setInteractive: (surface: SurfaceType, interactive: boolean) => Promise<void>;

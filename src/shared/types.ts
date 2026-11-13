@@ -285,6 +285,8 @@ export type LabWorkspaceType = {
   commit: string;
   ref: string;
   ready: boolean;
+  slim: boolean;
+  inUse: boolean;
   flows: string[];
   server: { running: boolean; port: number; pid?: number };
   runs: LabRunType[];

@@ -62,6 +62,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.LAB_CREATE, (_event, topic: string, ref: string) => hq.lab.createWorkspace(topic, ref));
   ipcMain.handle(Ipc.LAB_IMPORT, (_event, id: string, flow: string) => hq.lab.importExamples(id, flow));
   ipcMain.handle(Ipc.LAB_CANCEL, (_event, jobId: string) => hq.lab.cancel(jobId));
+  ipcMain.handle(Ipc.LAB_FREE_SPACE, (_event, id: string) => hq.lab.freeSpace(id));
   ipcMain.handle(Ipc.THREAD_CREATE, (_event, request: ThreadCreateRequestType) => hq.createThread(request));
   ipcMain.handle(Ipc.THREAD_ARCHIVE, (_event, id: string, removeWorktree: boolean) => hq.archiveThread(id, removeWorktree));
   ipcMain.handle(Ipc.THREAD_CLEAR, (_event, creatureId: string, threadId?: string) => hq.clearThread(creatureId, threadId));

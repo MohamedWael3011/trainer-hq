@@ -186,6 +186,7 @@ export const Ipc = {
   LAB_CREATE: 'lab:create',
   LAB_IMPORT: 'lab:import',
   LAB_CANCEL: 'lab:cancel',
+  LAB_FREE_SPACE: 'lab:free-space',
   AUTH_REFRESH: 'auth:refresh',
   AUTH_LOGIN: 'auth:login',
   OPEN_DASHBOARD: 'window:open-dashboard',

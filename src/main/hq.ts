@@ -163,6 +163,7 @@ export class Hq {
     this.scheduleHeld();
     this.auth = undefined;
     this.reloadVault();
+    this.lab.startAutoPrune();
     void this.refreshAuth();
     if (this.authTimer) clearInterval(this.authTimer);
     this.authTimer = setInterval(() => void this.refreshAuth(), AUTH_REFRESH_MS);
