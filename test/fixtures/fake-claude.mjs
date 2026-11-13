@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // A stand-in for the `claude` CLI that replays a scripted stream-json run.
 // FAKE_HELP_FLAGS limits which options `--help` lists (to imitate older versions).
+import { appendFileSync } from 'fs';
+import { basename } from 'path';
 import { createInterface } from 'readline';
 
 const args = process.argv.slice(2);
@@ -13,6 +15,12 @@ if (args[0] === '--help') {
   process.exit(0);
 }
 
+// FAKE_LOG records each run's account folder and resumed session; FAKE_LIMITED_CONFIG_DIR makes runs on
+// that account hit the plan limit, and FAKE_SESSION_BY_ACCOUNT names sessions after the account.
+const account = process.env.CLAUDE_CONFIG_DIR ? basename(process.env.CLAUDE_CONFIG_DIR) : 'default';
+const resumeAt = args.indexOf('--resume');
+if (process.env.FAKE_LOG && args[0] !== 'auth') appendFileSync(process.env.FAKE_LOG, `${JSON.stringify({ account, resume: resumeAt >= 0 ? args[resumeAt + 1] : null })}\n`);
+const SESSION = process.env.FAKE_SESSION_BY_ACCOUNT ? `sess-${account}` : 'sess-1';
 const out = (message) => process.stdout.write(`${JSON.stringify(message)}\n`);
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const received = [];
@@ -29,7 +37,11 @@ lines.on('line', (line) => {
 lines.on('close', () => { closed = true; });
 
 const turn = async () => {
-  out({ type: 'system', subtype: 'init', session_id: 'sess-1' });
+  out({ type: 'system', subtype: 'init', session_id: SESSION });
+  if (process.env.FAKE_LIMITED_CONFIG_DIR && process.env.FAKE_LIMITED_CONFIG_DIR === process.env.CLAUDE_CONFIG_DIR) {
+    out({ type: 'result', result: "You've hit your 5-hour limit · resets 11:50pm", is_error: true, session_id: SESSION });
+    process.exit(1);
+  }
   if (process.env.FAKE_COMPACT_LOOP) {
     for (let pass = 0; pass < 3; pass += 1) {
       out({ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'auto', pre_tokens: 87000, post_tokens: 54000 } });
@@ -55,7 +67,7 @@ const turn = async () => {
   }
   out({ type: 'assistant', message: { content: [{ type: 'text', text: `Hello from fake. Heard: ${received.join(' | ')}` }], usage: { input_tokens: 5, cache_read_input_tokens: 22000, cache_creation_input_tokens: 100 } } });
   out({ type: 'stream_event', event: { type: 'message_delta', usage: { output_tokens: 30 } } });
-  out({ type: 'result', result: `Heard: ${received.join(' | ')}`, is_error: false, session_id: 'sess-1', usage: { input_tokens: 15, output_tokens: 50, cache_read_input_tokens: 23000, cache_creation_input_tokens: 100 }, total_cost_usd: 0.01 });
+  out({ type: 'result', result: `Heard: ${received.join(' | ')}`, is_error: false, session_id: SESSION, usage: { input_tokens: 15, output_tokens: 50, cache_read_input_tokens: 23000, cache_creation_input_tokens: 100 }, total_cost_usd: 0.01 });
 };
 
 await wait(20);

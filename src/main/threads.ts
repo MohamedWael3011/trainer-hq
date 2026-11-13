@@ -170,6 +170,13 @@ export class ThreadStore {
     this.save();
   }
 
+  setRecap(id: string, recap: string): void {
+    const thread = this.get(id);
+    if (!thread || !recap) return;
+    thread.recap = recap;
+    this.save();
+  }
+
   consumeRecap(id: string): void {
     const thread = this.get(id);
     if (!thread?.recap) return;

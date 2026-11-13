@@ -1,0 +1,31 @@
+.rv { display: grid; gap: 6px; }
+.rv-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.rv-item { border-bottom: 1px solid var(--line); }
+.rv-item:last-child { border-bottom: 0; }
+.rv-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; }
+.rv-sprite { width: 32px; height: 32px; object-fit: contain; }
+.rv-main { display: grid; gap: 2px; text-align: left; min-width: 0; }
+.rv-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-meta { font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.rv-side { display: flex; gap: 4px; align-items: center; }
+.rv-error { color: var(--red); font-size: 12px; margin: 0 0 8px; }
+.rv-files { display: grid; gap: 10px; padding: 0 0 12px 44px; }
+.rv-file { display: grid; gap: 4px; min-width: 0; }
+.rv-file-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+.rv-file-path { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-diff {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--code-bg);
+  color: var(--code-fg);
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.rv-diff span { display: block; white-space: pre; min-height: 1.5em; }
+.rv-line-add { color: #7fe0a8; background: rgba(110, 231, 168, 0.08); }
+.rv-line-del { color: #ff9cb4; background: rgba(255, 122, 156, 0.08); }
+.rv-line-hunk { color: #b4a0ff; }
+.rv-line-meta { color: rgba(234, 220, 245, 0.5); }

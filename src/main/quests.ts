@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
-import { EventKind, QuestKind, QuestStatus, type QuestKindType, type QuestStatusType } from '@shared/constants';
+import { EventKind, QuestKind, QuestStatus, type QuestKindType, type QuestStatusType, type ReviewVerdictType } from '@shared/constants';
 import type { QuestEventType, QuestType, QuestUsageType, StatsType } from '@shared/types';
 import { profileHome } from './paths';
 
@@ -116,6 +116,22 @@ export class QuestStore {
     quest.sessionId = sessionId;
     this.sessions[quest.threadId ? `${quest.creatureId}:${quest.threadId}` : quest.creatureId] = sessionId;
     this.persist();
+  }
+
+  addChangedFile(id: string, path: string): void {
+    const quest = this.get(id);
+    if (!quest || quest.changedFiles?.includes(path)) return;
+    quest.changedFiles = [...(quest.changedFiles ?? []), path];
+    this.persist();
+    this.onChange();
+  }
+
+  setReview(id: string, verdict: ReviewVerdictType): void {
+    const quest = this.get(id);
+    if (!quest) return;
+    quest.review = verdict;
+    this.persist();
+    this.onChange();
   }
 
   markFreshSession(id: string): void {

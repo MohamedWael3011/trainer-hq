@@ -66,6 +66,11 @@ const Trainer = ({ state, onOpen }: PropsType) => {
               <label className="trainer-meter"><span>5-hour window</span><meter min={0} max={1} low={0.6} high={0.85} optimum={0} value={state.usage?.fiveHour ?? 0} /><b>{percent(state.usage?.fiveHour)}</b></label>
               <label className="trainer-meter"><span>7-day window</span><meter min={0} max={1} low={0.6} high={0.85} optimum={0} value={state.usage?.sevenDay ?? 0} /><b>{percent(state.usage?.sevenDay)}</b></label>
               {renderIf(!!state.usage?.resetsAt, <span className="faint">Resets {new Date(state.usage?.resetsAt ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>)}
+              {renderIf(!!state.usage?.hitsLimitAt, (
+                <span className="trainer-forecast">
+                  At the pace of the last 45 minutes, the 5-hour window runs out around {new Date(state.usage?.hitsLimitAt ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}, before it resets. Lighter models or fewer parallel quests stretch it.
+                </span>
+              ))}
             </div>
           ))}
         </div>

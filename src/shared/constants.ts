@@ -219,8 +219,27 @@ export const Ipc = {
   SCHEDULE_DELETE: 'schedule:delete',
   SCHEDULE_RUN: 'schedule:run',
   SESSION_ADOPT: 'session:adopt',
+  REVIEW_FILES: 'review:files',
+  REVIEW_DECIDE: 'review:decide',
   LOGIN_ITEM_SET: 'app:login-item-set',
 } as const;
+
+// How a file a quest changed differs from the last commit, for the review inbox.
+export const ReviewFileStatus = {
+  MODIFIED: 'modified',
+  ADDED: 'added',
+  DELETED: 'deleted',
+  UNTRACKED: 'untracked',
+  UNCHANGED: 'unchanged',
+  OUTSIDE: 'outside',
+} as const;
+export type ReviewFileStatusType = (typeof ReviewFileStatus)[keyof typeof ReviewFileStatus];
+
+export const ReviewVerdict = {
+  APPROVED: 'approved',
+  DISCARDED: 'discarded',
+} as const;
+export type ReviewVerdictType = (typeof ReviewVerdict)[keyof typeof ReviewVerdict];
 
 export const AUTO_MODEL = 'auto';
 export const LIGHT_MODEL = 'sonnet';

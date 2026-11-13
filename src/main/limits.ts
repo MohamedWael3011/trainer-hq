@@ -41,3 +41,24 @@ export const limitResetAt = (usage: UsageType | undefined, errorText: string | u
   }
   return parseClock(text, now);
 };
+
+export type UsageSampleType = { at: number; fiveHour: number };
+
+const FORECAST_LOOKBACK_MS = 45 * 60_000;
+const FORECAST_MIN_SPAN_MS = 10 * 60_000;
+const FORECAST_HORIZON_MS = 5 * HOUR_MS;
+
+// When the 5-hour window runs out at the pace of the last 45 minutes. Undefined when there is too
+// little to go on, usage isn't climbing, or the window resets first.
+export const forecastLimitAt = (samples: UsageSampleType[], resetsAt: number | undefined, now = Date.now()): number | undefined => {
+  const recent = samples.filter((sample) => now - sample.at <= FORECAST_LOOKBACK_MS);
+  if (recent.length < 2) return undefined;
+  const first = recent[0];
+  const last = recent[recent.length - 1];
+  const span = last.at - first.at;
+  const climb = last.fiveHour - first.fiveHour;
+  if (span < FORECAST_MIN_SPAN_MS || climb <= 0 || last.fiveHour >= 1) return undefined;
+  const hitsAt = last.at + ((1 - last.fiveHour) / climb) * span;
+  const until = resetsAt && resetsAt > now ? resetsAt : now + FORECAST_HORIZON_MS;
+  return hitsAt < until ? Math.max(hitsAt, now) : undefined;
+};

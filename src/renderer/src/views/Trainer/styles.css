@@ -24,3 +24,4 @@
 .trainer-login { display: flex; align-items: center; gap: 10px; font-size: 12px; cursor: pointer; }
 .trainer-login input { width: 16px; height: 16px; accent-color: #ff8cc6; }
 .trainer-signin { color: #ffd1e8; font-weight: 700; text-decoration: underline; }
+.trainer-forecast { color: var(--amber); font-weight: 700; }

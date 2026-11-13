@@ -5,6 +5,7 @@ import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
 import Schedules from '../../components/Schedules/Schedules';
+import ReviewInbox from '../../components/ReviewInbox/ReviewInbox';
 import { renderIf } from '../../lib/renderIf';
 import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, questUsageSummary, timeAgo } from '../../lib/format';
 import './styles.css';
@@ -45,8 +46,9 @@ const Quests = ({ state, onOpen }: PropsType) => {
           ))}
         </div>
       </div>
-      <Schedules state={state} />
       {state.approvals.map((approval) => <ApprovalCard key={approval.id} state={state} approval={approval} />)}
+      <ReviewInbox state={state} onOpen={onOpen} />
+      <Schedules state={state} />
       <div className="quests-list">
         {quests.map((quest) => {
           const lastError = [...quest.events].reverse().find((event) => event.kind === EventKind.ERROR);

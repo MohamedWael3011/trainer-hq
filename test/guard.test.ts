@@ -33,11 +33,11 @@ describe('planClaudeRun', () => {
 
 describe('creature limits', () => {
   const limited = { ...creature, tools: { allow: ['Read'], ask: ['Bash(git commit:*)'], deny: ['Write'] } } as unknown as CreatureType;
-  const argsFor = (askBeyondLimits: boolean, supports?: (flag: string) => boolean) =>
+  const argsFor = (askBeyondLimits: boolean, supports?: (flag: string) => boolean, unattended?: boolean) =>
     planClaudeRun({
       creature: limited,
       profile: { ...profile, guard: { ...profile.guard, alwaysDeny: ['Bash(sudo:*)'], askBeyondLimits } } as unknown as ProfileConfigType,
-      systemPrompt: 'hi', bridge, questId: 'quest-1234', supports,
+      systemPrompt: 'hi', bridge, questId: 'quest-1234', supports, unattended,
     }).args;
   const askRules = (args: string[]) => JSON.parse(args[args.indexOf('--settings') + 1]).permissions.ask;
   const denyRules = (args: string[]) => args.slice(args.indexOf('--disallowedTools') + 1).filter((arg, index, rest) => !rest.slice(0, index + 1).includes('--settings') && rest[index - 1] !== '--settings');
@@ -52,6 +52,12 @@ describe('creature limits', () => {
     const args = argsFor(true);
     expect(args).not.toContain('--disallowedTools');
     expect(askRules(args)).toEqual(['Bash(git commit:*)', 'Bash(sudo:*)', 'Write']);
+  });
+
+  it('keeps refusing for an unattended run, since nobody can answer the approval', () => {
+    const args = argsFor(true, undefined, true);
+    expect(denyRules(args)).toEqual(['Bash(sudo:*)', 'Write']);
+    expect(askRules(args)).toEqual(['Bash(git commit:*)']);
   });
 
   it('keeps refusing on a CLI that cannot take ask rules', () => {

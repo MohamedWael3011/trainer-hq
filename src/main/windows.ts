@@ -264,7 +264,8 @@ export class Windows {
     this.notch.webContents.send(Ipc.NOTCH_TOGGLE, { instant: true });
   }
 
-  openDashboard(creatureId?: string): void {
+  // view opens one section (such as quests) once the window is up.
+  openDashboard(creatureId?: string, view?: string): void {
     if (!this.dashboard || this.dashboard.isDestroyed()) {
       this.dashboard = new BrowserWindow({
         ...DASHBOARD_SIZE,
@@ -282,12 +283,14 @@ export class Windows {
       this.dashboard.once('ready-to-show', () => {
         this.dashboard?.show();
         if (creatureId) this.dashboard?.webContents.send(Ipc.FOCUS_CREATURE, creatureId);
+        if (view) this.dashboard?.webContents.send(Ipc.OPEN_VIEW, view);
       });
       return;
     }
     this.dashboard.show();
     this.dashboard.focus();
     if (creatureId) this.dashboard.webContents.send(Ipc.FOCUS_CREATURE, creatureId);
+    if (view) this.dashboard.webContents.send(Ipc.OPEN_VIEW, view);
   }
 
   labeled(): [string, BrowserWindow][] {

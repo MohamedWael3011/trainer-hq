@@ -1,7 +1,7 @@
 import { join } from 'path';
 import { app, dialog, globalShortcut, ipcMain, net, Notification, protocol, shell } from 'electron';
 import { DOCK_SHORTCUT, Ipc, LAB_PROTOCOL, OUTPUT_PROTOCOL, NOTCH_SHORTCUT, SPRITE_PROTOCOL, type AutonomyType, type SurfaceType } from '@shared/constants';
-import type { CreatureContextRequestType, ScheduleSaveRequestType, SessionAdoptRequestType, ApprovalDecisionType, ChatRequestType, DaycareDecisionType, DockSizeType, HatchRequestType, LabShootRequestType, ProfileCreateRequestType, ProfileSettingsType, SkillInstallRequestType, ThreadCreateRequestType } from '@shared/types';
+import type { ReviewDecisionType, CreatureContextRequestType, ScheduleSaveRequestType, SessionAdoptRequestType, ApprovalDecisionType, ChatRequestType, DaycareDecisionType, DockSizeType, HatchRequestType, LabShootRequestType, ProfileCreateRequestType, ProfileSettingsType, SkillInstallRequestType, ThreadCreateRequestType } from '@shared/types';
 import { expandHome } from './paths';
 import { pathToFileURL } from 'url';
 import { inspectAttachment, savePastedFile } from './attachments';
@@ -78,7 +78,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.THREAD_HELD_CANCEL, (_event, creatureId: string, threadId?: string) => hq.cancelHeld(creatureId, threadId));
   ipcMain.handle(Ipc.AUTH_LOGIN, () => hq.openLogin());
   ipcMain.handle(Ipc.PROFILE_CREATE, (_event, request: ProfileCreateRequestType) => hq.createProfile(request));
-  ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string) => windows.openDashboard(creatureId));
+  ipcMain.handle(Ipc.OPEN_DASHBOARD, (_event, creatureId?: string, view?: string) => windows.openDashboard(creatureId, view));
   ipcMain.handle(Ipc.SURFACE_INTERACTIVE, (_event, surface: SurfaceType, interactive: boolean) => windows.setInteractive(surface, interactive));
   ipcMain.handle(Ipc.OPEN_PATH, (_event, target?: string) => shell.openPath(target ?? hq.vaultPath()));
   ipcMain.handle(Ipc.SIGN_IN, (_event, kind: unknown) => hq.signIn(kind));
@@ -102,6 +102,8 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.SCHEDULE_SAVE, (_event, request: ScheduleSaveRequestType) => hq.saveSchedule(request));
   ipcMain.handle(Ipc.SCHEDULE_DELETE, (_event, id: string) => hq.deleteSchedule(id));
   ipcMain.handle(Ipc.SCHEDULE_RUN, (_event, id: string) => hq.runSchedule(id));
+  ipcMain.handle(Ipc.REVIEW_FILES, (_event, questId: string) => hq.reviewFiles(questId));
+  ipcMain.handle(Ipc.REVIEW_DECIDE, (_event, decision: ReviewDecisionType) => hq.decideReview(decision, (path) => shell.trashItem(path)));
   ipcMain.handle(Ipc.SESSION_ADOPT, (_event, request: SessionAdoptRequestType) => hq.adoptSession(request));
   ipcMain.handle(Ipc.LOGIN_ITEM_SET, (_event, enabled: boolean) => app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true }));
 };

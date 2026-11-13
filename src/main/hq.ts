@@ -15,6 +15,7 @@ import {
   EventKind,
   QuestKind,
   QuestStatus,
+  ReviewVerdict,
   type AutonomyType,
   type QuestKindType,
 } from '@shared/constants';
@@ -45,6 +46,8 @@ import type {
   ScheduleType,
   SessionAdoptRequestType,
   TerminalSessionType,
+  ReviewDecisionType,
+  ReviewFileType,
 } from '@shared/types';
 import { ApprovalBroker, type AskRequestType, type ScheduleToolRequestType } from './approvals';
 import { attachmentDirs, detectPaths, inlineImages, installSkill, prepareAttachments } from './attachments';
@@ -52,7 +55,7 @@ import { checkAuth, openLoginTerminal, openSessionTerminal, runInTerminal } from
 import { googleCloudSignedIn } from './cloudAuth';
 import { GOOGLE_CLOUD_EXPIRED_NOTE, SIGN_IN_COMMAND, isSignInKind } from '@shared/signIn';
 import { checkForUpdate } from './updates';
-import { limitResetAt } from './limits';
+import { forecastLimitAt, limitResetAt, type UsageSampleType } from './limits';
 import { describeCommands } from './commands';
 import { newOutputs, pathsInText } from './outputs';
 import { claudeFlagSupport, resetFlagSupport } from './engines/claudeFlags';
@@ -62,9 +65,10 @@ import { BUDGET_DAYS, UsageLedger } from './ledger';
 import { NoteReadLog } from './noteReads';
 import { isLightModel, resolveModel } from './routing';
 import { ScheduleStore } from './schedules';
+import { discardFiles, editedPath, reviewFiles } from './review';
 import { scanTerminalSessions, terminalSessionRecap } from './sessionWatch';
 import { listTemplates, seedTemplates } from './templates';
-import { INTERRUPTED_RESUME_MAX_TOKENS, addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
+import { INTERRUPTED_RESUME_MAX_TOKENS, claudeDirEnv, addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
 import { approveNote, buildProposalPrompt, dismissNote, inlineProposals, listDaycare, parseProposals, worthReviewing, writeProposals, type ProposalType } from './daycare';
 import { runClaude } from './engines/claude';
 import { runCli } from './engines/cli';
@@ -86,6 +90,11 @@ const AGY_SESSION_PREFIX = 'agy:';
 const NOTE_TOOLS = new Set(['Read', 'Grep']);
 const CONTEXT_OPTION_IDS = Object.values(ContextOption) as string[];
 const SESSION_WATCH_MS = 60_000;
+const USAGE_SAMPLES_KEPT = 200;
+// Sessions made on the backup account are tagged, since the main account cannot resume them.
+const BACKUP_SESSION_PREFIX = 'backup:';
+// When a limit message gives no reset time, try the main account again after this long.
+const UNKNOWN_RESET_MS = 60 * 60_000;
 const SCHEDULE_TICK_MS = 30_000;
 const DEFAULT_COLD_MINUTES = 60;
 const TOKENS_PER_K = 1000;
@@ -142,6 +151,12 @@ export class Hq {
   private errors: string[] = [];
   private spriteRev: Record<string, number> = {};
   private usage: UsageType | undefined;
+  // Recent 5-hour readings in the current window, for the forecast of when it runs out.
+  private usageSamples: UsageSampleType[] = [];
+  // While the main account is at its plan limit, Claude runs go to the backup account (limitFallbackConfigDir).
+  private mainLimitedUntil = 0;
+  private backupLimitedUntil = 0;
+  private backupUsage: UsageType | undefined;
   private ui = loadUi();
   private auth: AuthStatusType | undefined;
   private authTimer: NodeJS.Timeout | undefined;
@@ -306,6 +321,7 @@ export class Hq {
       spriteRev: this.spriteRev,
       stats: this.quests.stats(),
       usage: this.currentUsage(),
+      backupAccountUntil: this.onBackupAccount() ? this.mainLimitedUntil : undefined,
       ui: this.ui,
       labEnabled: !!this.profile.lab,
       auth: this.auth,
@@ -339,14 +355,20 @@ export class Hq {
     return creature;
   }
 
-  private env(artifacts = true, helperModel = ''): NodeJS.ProcessEnv {
+  private onBackupAccount(now = Date.now()): boolean {
+    return !!this.profile.limitFallbackConfigDir && this.mainLimitedUntil > now && this.backupLimitedUntil <= now;
+  }
+
+  private env(artifacts = true, helperModel = '', backup = false): NodeJS.ProcessEnv {
     // Headless Claude Code leaves out the Artifact tools unless this is set. Set it to 0 under
     // env: in profile.yaml to turn them off.
     const helpers: NodeJS.ProcessEnv = helperModel ? { CLAUDE_CODE_SUBAGENT_MODEL: helperModel, CLAUDE_CODE_SUBAGENT_MODEL_FORCE: '1' } : {};
     const env: NodeJS.ProcessEnv = { CLAUDE_CODE_ARTIFACT: '1', BASH_MAX_OUTPUT_LENGTH: BASH_OUTPUT_CHARS, ...helpers, ...process.env, ...this.profile.env };
     if (!artifacts) delete env.CLAUDE_CODE_ARTIFACT;
     delete env.ELECTRON_RUN_AS_NODE;
-    if (this.profile.claudeConfigDir) env.CLAUDE_CONFIG_DIR = this.profile.claudeConfigDir;
+    const configDir = backup ? claudeDirEnv(this.profile.limitFallbackConfigDir) : this.profile.claudeConfigDir;
+    if (configDir) env.CLAUDE_CONFIG_DIR = configDir;
+    else delete env.CLAUDE_CONFIG_DIR;
     return env;
   }
 
@@ -365,7 +387,8 @@ export class Hq {
         if (!signedIn) this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: GOOGLE_CLOUD_EXPIRED_NOTE });
       });
     }
-    const planUsage = this.currentUsage()?.fiveHour ?? 0;
+    const backup = engine.adapter === EngineAdapter.CLAUDE && this.onBackupAccount();
+    const planUsage = (backup ? this.backupUsage : this.currentUsage())?.fiveHour ?? 0;
     // The plan-usage guard is about the Claude plan; other engines have their own quotas.
     if (engine.adapter === EngineAdapter.CLAUDE && creature.autonomy === Autonomy.FULL_AUTO && planUsage >= this.profile.guard.fullAutoMaxPlanUsage) {
       this.quests.addEvent(quest.id, {
@@ -394,34 +417,41 @@ export class Hq {
     const isCompact = /^\/compact\b/.test(prompt.trim());
     const hasSessions = engine.adapter === EngineAdapter.CLAUDE || engine.adapter === EngineAdapter.ANTIGRAVITY;
     // Claude and Antigravity can't resume each other's sessions, so a creature that switched engines starts over.
-    const switched = !!stored && hasSessions && stored.startsWith(AGY_SESSION_PREFIX) !== (engine.adapter === EngineAdapter.ANTIGRAVITY);
+    const switchedEngine = !!stored && hasSessions && stored.startsWith(AGY_SESSION_PREFIX) !== (engine.adapter === EngineAdapter.ANTIGRAVITY);
+    // Each Claude account keeps its own sessions, so moving to or from the backup account starts over too.
+    const switchedAccount = !!stored && !switchedEngine && engine.adapter === EngineAdapter.CLAUDE && stored.startsWith(BACKUP_SESSION_PREFIX) !== backup;
+    const switched = switchedEngine || switchedAccount;
     const cold = !!stored && hasSessions && !switched && !isCompact && this.isColdAndLarge(stored);
     if (stored && (switched || cold)) {
       // Either way, carry the last few exchanges over so the creature doesn't start from nothing.
       const recap = this.quests.recap(stored);
       this.quests.clearSession(sessionKey);
       stored = undefined;
-      const why = switched ? 'was held by another engine' : 'was closed to save tokens (it was large and idle)';
+      const why = switchedAccount ? 'ran on another Claude account' : switched ? 'was held by another engine' : 'was closed to save tokens (it was large and idle)';
       recapContext = recap
         ? `This chat continues an earlier conversation that ${why}. The last exchanges were:\n\n${recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`
         : '';
       this.quests.addEvent(quest.id, {
         kind: EventKind.SYSTEM,
-        text: switched
+        text: switchedAccount
+          ? backup
+            ? 'Continuing on your backup Claude account while the main one is at its plan limit. Started a fresh session there with a short recap.'
+            : 'Back on your main Claude account now that its plan limit has reset. Started a fresh session with a short recap.'
+          : switched
           ? 'Started a fresh session: this creature switched engines, and the old session can only be resumed by the engine that made it. A short recap was carried over.'
           : 'Started a fresh session: the previous one was large and idle, so resuming it would have resent the whole conversation. A short recap was carried over.',
       });
     }
     if (thread?.recap && !stored && !recapContext) {
       const origin = thread.kind === ThreadKind.RECURRING
-        ? 'This thread runs a recurring quest that was set up in another chat. The last exchanges there were'
+        ? 'This thread runs a recurring quest, and each run starts a fresh session. The last exchanges from its previous run (or the chat that set it up) were'
         : 'This thread continues a Claude Code terminal session that had grown too large to keep resending. The last exchanges were';
       recapContext = `${origin}:\n\n${thread.recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`;
       this.threads.consumeRecap(thread.id);
     }
     const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, [threadContext, recapContext].filter(Boolean).join('\n\n'));
     const agySession = stored?.startsWith(AGY_SESSION_PREFIX) ? stored.slice(AGY_SESSION_PREFIX.length) : undefined;
-    const claudeSession = stored && !stored.startsWith(AGY_SESSION_PREFIX) ? stored : undefined;
+    const claudeSession = stored && !stored.startsWith(AGY_SESSION_PREFIX) ? stored.replace(BACKUP_SESSION_PREFIX, '') : undefined;
     const isClaudeEngine = engine.adapter === EngineAdapter.CLAUDE;
     const routedModel = isClaudeEngine
       ? resolveModel({
@@ -444,12 +474,15 @@ export class Hq {
     };
     const callbacks = {
       onToolUse: (name: string, input: Record<string, unknown>) => {
+        const edited = editedPath(name, input);
+        // Brain notes go through Day Care; only work outside the vault is up for review.
+        if (edited && !edited.startsWith(this.profile.vault)) this.quests.addChangedFile(quest.id, edited);
         if (!NOTE_TOOLS.has(name)) return;
         const target = input.file_path ?? input.path;
         if (typeof target === 'string' && target.startsWith(this.profile.vault)) this.noteReads.record(target);
       },
       onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => this.quests.addEvent(quest.id, event),
-      onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : sessionId),
+      onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : backup ? `${BACKUP_SESSION_PREFIX}${sessionId}` : sessionId),
       onQuestUsage: (questUsage: QuestUsageType) => this.quests.setUsage(quest.id, questUsage),
       onLive: (live: QuestLiveType) => this.setLive(quest.id, live),
       onCommands: (names: string[]) => this.commandNames.set(creature.id, names),
@@ -465,6 +498,11 @@ export class Hq {
           });
       },
       onUsage: (usage: UsageType) => {
+        if (backup) {
+          this.backupUsage = usage;
+          return;
+        }
+        this.recordUsageSample(usage);
         this.usage = usage;
         // Refresh the plan ring when the window resets, even if nothing else changes then.
         if (this.usageTimer) clearTimeout(this.usageTimer);
@@ -488,6 +526,7 @@ export class Hq {
         sessionName: `${creature.name} · ${thread?.title ?? MAIN_CHAT_TITLE}`,
         context,
         floorTokens: this.quests.sessionFloor(creature.id),
+        unattended: !!options.request?.unattended,
         bridge: {
           serverScript: join(resourcesDir(), 'mcp', 'permission-server.cjs'),
           nodeBinary: process.execPath,
@@ -497,7 +536,7 @@ export class Hq {
         },
       });
       if (!claudeSession && !isCompact) this.quests.markFreshSession(quest.id);
-      handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(context.artifacts, isLightModel(creature.model) ? '' : this.profile.session.lightModel), timeoutMs: plan.timeoutMs, callbacks });
+      handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(context.artifacts, isLightModel(creature.model) ? '' : this.profile.session.lightModel, backup), timeoutMs: plan.timeoutMs, callbacks });
     } else if (engine.adapter === EngineAdapter.ANTIGRAVITY) {
       const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
       const args = planAntigravityArgs({ autonomy: creature.autonomy, model: creature.model, addDirs: [creature.dir, ...creature.addDirs], conversationId: agySession });
@@ -558,7 +597,26 @@ export class Hq {
       }
       if (outcome.usageLimited) {
         // The rate-limit report is about the Claude plan; other engines only say it in their error.
-        const resumeAt = options.request ? limitResetAt(engine.adapter === EngineAdapter.CLAUDE ? this.usage : undefined, outcome.error) : undefined;
+        const isClaude = engine.adapter === EngineAdapter.CLAUDE;
+        const accountReset = isClaude ? limitResetAt(backup ? this.backupUsage : this.usage, outcome.error) ?? Date.now() + UNKNOWN_RESET_MS : 0;
+        if (isClaude && backup) this.backupLimitedUntil = accountReset;
+        if (isClaude && !backup) this.mainLimitedUntil = accountReset;
+        if (isClaude && options.request && this.onBackupAccount()) {
+          const request = options.request;
+          this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: `Plan usage limit reached. Sending this again on your backup Claude account; the main one resets at ${clockLabel(accountReset)}.` });
+          this.quests.setStatus(quest.id, QuestStatus.PAUSED);
+          setTimeout(() => {
+            try {
+              this.chat(request);
+            } catch {
+              // The creature or thread is gone; nothing to send to.
+            }
+          }, 0);
+          return;
+        }
+        // On the backup account the message can go again once either account resets.
+        const bothReset = backup && this.mainLimitedUntil > Date.now() ? Math.min(this.mainLimitedUntil, accountReset) : undefined;
+        const resumeAt = options.request ? bothReset ?? limitResetAt(isClaude ? this.usage : undefined, outcome.error) : undefined;
         if (options.request && resumeAt) {
           this.hold(sessionKey, options.request, resumeAt, quest.id);
           // Not an error the user has to act on, so it reads as a notice.
@@ -591,7 +649,7 @@ export class Hq {
     // Antigravity doesn't report token counts, so its size is the estimate kept per reply.
     const size = sessionId.startsWith(AGY_SESSION_PREFIX)
       ? this.quests.sessionTokenEstimate(sessionId)
-      : activity.contextTokens ?? sessionContextFromLog(sessionId, this.profile.claudeConfigDir);
+      : activity.contextTokens ?? (sessionId.startsWith(BACKUP_SESSION_PREFIX) ? undefined : sessionContextFromLog(sessionId, this.profile.claudeConfigDir));
     if (sessionId.startsWith(AGY_SESSION_PREFIX)) return (size ?? 0) >= Math.min(idleResetMinTokens, AGY_RESET_MIN_TOKENS);
     const limit = this.quests.sessionInterrupted(sessionId) ? Math.max(idleResetMinTokens, INTERRUPTED_RESUME_MAX_TOKENS) : idleResetMinTokens;
     return (size ?? 0) >= limit;
@@ -651,11 +709,18 @@ export class Hq {
     this.emit();
   }
 
+  private recordUsageSample(usage: UsageType): void {
+    if (usage.fiveHour === undefined) return;
+    // A new window starts the climb over.
+    if (this.usage?.resetsAt !== usage.resetsAt) this.usageSamples = [];
+    this.usageSamples = [...this.usageSamples, { at: usage.updatedAt, fiveHour: usage.fiveHour }].slice(-USAGE_SAMPLES_KEPT);
+  }
+
   // Claude Code only reports usage during a run, so once the 5-hour window has reset the last
   // report is stale: count the window as empty until the next run reports again.
   private currentUsage(): UsageType | undefined {
     const usage = this.usage;
-    if (!usage?.resetsAt || usage.resetsAt > Date.now()) return usage;
+    if (!usage?.resetsAt || usage.resetsAt > Date.now()) return usage && { ...usage, hitsLimitAt: forecastLimitAt(this.usageSamples, usage.resetsAt) };
     return { ...usage, status: 'allowed', fiveHour: 0, resetsAt: undefined };
   }
 
@@ -887,14 +952,15 @@ export class Hq {
     if (this.liveChats.has(sessionKey)) throw new Error(`${creature.name} is still working. Open it in the terminal when the reply is done.`);
     const stored = this.quests.sessionFor(sessionKey);
     if (!stored || stored.startsWith(AGY_SESSION_PREFIX)) throw new Error('This chat has no Claude Code session to open yet.');
+    const onBackup = stored.startsWith(BACKUP_SESSION_PREFIX);
     const folder = thread?.cwd ?? creature.cwd;
     const cwd = folder && existsSync(folder) ? folder : this.profile.vault;
     openSessionTerminal({
       bin: (this.profile.engines[creature.engine] ?? this.profile.engines.claude).bin,
       cwd,
-      sessionId: stored,
+      sessionId: stored.replace(BACKUP_SESSION_PREFIX, ''),
       addDirs: [creature.dir, ...creature.addDirs].filter((dir) => existsSync(dir)),
-      claudeConfigDir: this.profile.claudeConfigDir,
+      claudeConfigDir: onBackup ? claudeDirEnv(this.profile.limitFallbackConfigDir) : this.profile.claudeConfigDir,
     });
   }
 
@@ -1095,6 +1161,32 @@ export class Hq {
     return `Scheduled. First run: ${new Date(next).toLocaleString()}. It runs ${ownThread ? `in its own thread, "${ownThread.title}", not in this chat,` : 'in this thread'} while Trainer HQ is open; the user can pause or delete it in the Quests tab.`;
   }
 
+  reviewFiles(questId: string): ReviewFileType[] {
+    const quest = this.quests.get(questId);
+    if (!quest) throw new Error('That quest is no longer in the log.');
+    return reviewFiles(quest.changedFiles ?? []);
+  }
+
+  // Approve just files the quest away. Discard puts its files back to the last commit and returns
+  // the ones that could not be restored.
+  async decideReview(decision: ReviewDecisionType, trash: (path: string) => Promise<void>): Promise<string[]> {
+    const quest = this.quests.get(decision.questId);
+    if (!quest) throw new Error('That quest is no longer in the log.');
+    if (decision.verdict === ReviewVerdict.APPROVED) {
+      this.quests.setReview(quest.id, ReviewVerdict.APPROVED);
+      return [];
+    }
+    const failed = await discardFiles(quest.changedFiles ?? [], trash);
+    this.quests.setReview(quest.id, ReviewVerdict.DISCARDED);
+    this.quests.addEvent(quest.id, {
+      kind: EventKind.SYSTEM,
+      text: failed.length === 0
+        ? 'Changes discarded from the review inbox: its files were put back to the last commit, and new files moved to the Trash.'
+        : `Changes discarded from the review inbox, except ${failed.join(', ')}, which could not be restored.`,
+    });
+    return failed;
+  }
+
   private runDueSchedules(): void {
     this.schedules.due().forEach((schedule) => {
       this.schedules.markRan(schedule.id);
@@ -1119,11 +1211,37 @@ export class Hq {
   }
 
   private fireSchedule(schedule: ScheduleType): void {
+    const skip = (reason: string): void => {
+      this.errors = [...this.errors, `Recurring quest skipped: ${reason}`];
+      this.nudge({ title: 'Recurring quest skipped', body: reason });
+    };
     try {
-      const questId = this.chat({ creatureId: schedule.creatureId, text: schedule.prompt, threadId: this.scheduleThread(schedule).id });
-      this.quests.addEvent(questId, { kind: EventKind.SYSTEM, text: 'Recurring quest: started on its schedule.' });
+      const creature = this.creature(schedule.creatureId);
+      const thread = this.scheduleThread(schedule);
+      const sessionKey = threadKey(creature.id, thread.id);
+      // An overrunning or held run would otherwise get this one queued behind it, and an hourly
+      // quest that takes longer than an hour would pile up runs.
+      if (this.liveChats.has(sessionKey) || this.held.has(sessionKey)) {
+        this.nudge({ title: `${creature.name}: recurring quest still running`, body: 'Its previous run has not finished, so this one was skipped.' });
+        this.emit();
+        return;
+      }
+      const budget = creature.weeklyBudgetUsd;
+      if (budget && this.ledger.spentSince(creature.id, BUDGET_DAYS) >= budget) {
+        skip(`${creature.name} has reached its weekly budget of $${budget.toFixed(2)}.`);
+        this.emit();
+        return;
+      }
+      // Each run starts fresh with a short recap of the last one, instead of resending every earlier run.
+      const stored = this.quests.sessionFor(sessionKey);
+      if (stored) {
+        this.threads.setRecap(thread.id, this.quests.recap(stored, 1));
+        this.quests.clearSession(sessionKey);
+      }
+      const questId = this.chat({ creatureId: creature.id, text: schedule.prompt, threadId: thread.id, unattended: true });
+      this.quests.addEvent(questId, { kind: EventKind.SYSTEM, text: 'Recurring quest: started on its schedule, in a fresh session.' });
     } catch (error) {
-      this.errors = [...this.errors, `Recurring quest skipped: ${(error as Error).message}`];
+      skip((error as Error).message);
     }
     this.emit();
   }
@@ -1249,5 +1367,6 @@ export class Hq {
     if (this.scheduleTimer) clearInterval(this.scheduleTimer);
     this.lab.stopAll();
     this.approvals.stop();
+    this.ledger.flush();
   }
 }

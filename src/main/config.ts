@@ -55,6 +55,8 @@ export type ProfileConfigType = {
   name: string;
   vault: string;
   claudeConfigDir?: string;
+  // A second signed-in Claude account to continue on while this one is at its plan limit.
+  limitFallbackConfigDir?: string;
   repos: Record<string, string>;
   engines: Record<string, EngineConfigType>;
   guard: GuardConfigType;
@@ -138,6 +140,17 @@ export const DEFAULT_ALWAYS_DENY = [
 const profilesPath = (): string => join(appHome(), PROFILES_FILE);
 
 const DEFAULT_CLAUDE_DIR = join(homedir(), '.claude');
+
+// The backup account may be the default ~/.claude login, so unlike claudeConfigDir it is kept as a path.
+// Pointing it at the same account as the profile would be no backup at all.
+export const fallbackClaudeDir = (value: unknown, primary: string | undefined): string | undefined => {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  const dir = resolve(expandHome(value.trim()));
+  return dir === resolve(primary ?? DEFAULT_CLAUDE_DIR) ? undefined : dir;
+};
+
+// CLAUDE_CONFIG_DIR for an account folder: unset for the default login, which Claude only finds that way.
+export const claudeDirEnv = (dir: string | undefined): string | undefined => (dir && resolve(dir) !== resolve(DEFAULT_CLAUDE_DIR) ? dir : undefined);
 
 const customClaudeDir = (value: unknown): string | undefined => {
   if (typeof value !== 'string' || !value.trim()) return undefined;
@@ -266,6 +279,7 @@ export const loadProfileConfig = (vaultSetting: string): ProfileConfigType => {
     name: typeof data.name === 'string' ? data.name : 'Trainer',
     vault,
     claudeConfigDir: customClaudeDir(data.claudeConfigDir),
+    limitFallbackConfigDir: fallbackClaudeDir(data.limitFallbackConfigDir, customClaudeDir(data.claudeConfigDir)),
     repos,
     engines,
     guard: {

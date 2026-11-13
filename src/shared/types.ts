@@ -17,6 +17,8 @@ import type {
   EventKindType,
   QuestKindType,
   QuestStatusType,
+  ReviewFileStatusType,
+  ReviewVerdictType,
 } from './constants';
 
 export type CreatureToolsType = {
@@ -113,6 +115,22 @@ export type QuestType = {
   usage?: QuestUsageType;
   // The run started a new Claude Code session, so its first turn paid the one-time setup.
   freshSession?: boolean;
+  // Files outside the vault the run edited or wrote, for the review inbox.
+  changedFiles?: string[];
+  review?: ReviewVerdictType;
+};
+
+export type ReviewFileType = {
+  path: string;
+  repo?: string;
+  status: ReviewFileStatusType;
+  diff: string;
+  truncated: boolean;
+};
+
+export type ReviewDecisionType = {
+  questId: string;
+  verdict: ReviewVerdictType;
 };
 
 export type ThreadType = {
@@ -178,6 +196,8 @@ export type UsageType = {
   sevenDay?: number;
   resetsAt?: number;
   updatedAt: number;
+  // When the 5-hour window runs out at the current pace, if that comes before it resets.
+  hitsLimitAt?: number;
 };
 
 export type DockSizeType = {
@@ -226,6 +246,8 @@ export type AppStateType = {
   spriteRev: Record<string, number>;
   stats: StatsType;
   usage?: UsageType;
+  // While set, Claude runs use the backup account until the main one resets at this time.
+  backupAccountUntil?: number;
   ui: UiStateType;
   labEnabled: boolean;
   auth?: AuthStatusType;
@@ -283,6 +305,8 @@ export type ChatRequestType = {
   text: string;
   attachments?: string[];
   threadId?: string;
+  // Sent by a recurring quest with nobody watching: limits are refused, never turned into approvals.
+  unattended?: boolean;
 };
 
 export type AttachmentInfoType = {
@@ -348,6 +372,7 @@ export type ProfileSettingsType = {
   name: string;
   vault: string;
   claudeConfigDir: string;
+  limitFallbackConfigDir: string;
   repos: { name: string; path: string }[];
   engines: { name: string; adapter: EngineAdapterType; bin: string; args: string[] }[];
   guard: { maxMinutes: number; maxPlanUsage: number; worktree: boolean; alwaysDeny: string[]; builtInDeny: string[]; askBeyondLimits: boolean };

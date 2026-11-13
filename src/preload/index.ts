@@ -26,6 +26,8 @@ import type {
   CreatureContextRequestType,
   ScheduleSaveRequestType,
   SessionAdoptRequestType,
+  ReviewFileType,
+  ReviewDecisionType,
 } from '@shared/types';
 
 const subscribe = <T>(channel: string, callback: (payload: T) => void): (() => void) => {
@@ -98,7 +100,7 @@ const api: HqApiType = {
   labCancel: (jobId: string): Promise<void> => ipcRenderer.invoke(Ipc.LAB_CANCEL, jobId),
   labFreeSpace: (workspaceId: string): Promise<void> => ipcRenderer.invoke(Ipc.LAB_FREE_SPACE, workspaceId),
   openLogin: (): Promise<void> => ipcRenderer.invoke(Ipc.AUTH_LOGIN),
-  openDashboard: (creatureId?: string): Promise<void> => ipcRenderer.invoke(Ipc.OPEN_DASHBOARD, creatureId),
+  openDashboard: (creatureId?: string, view?: string): Promise<void> => ipcRenderer.invoke(Ipc.OPEN_DASHBOARD, creatureId, view),
   setInteractive: (surface: SurfaceType, interactive: boolean): Promise<void> => ipcRenderer.invoke(Ipc.SURFACE_INTERACTIVE, surface, interactive),
   openPath: (target?: string): Promise<string> => ipcRenderer.invoke(Ipc.OPEN_PATH, target),
   signIn: (kind: SignInKindType): Promise<void> => ipcRenderer.invoke(Ipc.SIGN_IN, kind),
@@ -112,6 +114,8 @@ const api: HqApiType = {
   saveSchedule: (request: ScheduleSaveRequestType): Promise<string> => ipcRenderer.invoke(Ipc.SCHEDULE_SAVE, request),
   deleteSchedule: (id: string): Promise<void> => ipcRenderer.invoke(Ipc.SCHEDULE_DELETE, id),
   runSchedule: (id: string): Promise<void> => ipcRenderer.invoke(Ipc.SCHEDULE_RUN, id),
+  reviewFiles: (questId: string): Promise<ReviewFileType[]> => ipcRenderer.invoke(Ipc.REVIEW_FILES, questId),
+  decideReview: (decision: ReviewDecisionType): Promise<string[]> => ipcRenderer.invoke(Ipc.REVIEW_DECIDE, decision),
   adoptSession: (request: SessionAdoptRequestType): Promise<string> => ipcRenderer.invoke(Ipc.SESSION_ADOPT, request),
 };
 

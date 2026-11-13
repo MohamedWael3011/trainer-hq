@@ -72,6 +72,11 @@ export const runSmokeIfRequested = (host: SmokeHostType): void => {
       host.openView(process.env.THQ_SMOKE_VIEW);
       await new Promise((resolve) => setTimeout(resolve, 2500));
     }
+    // THQ_SMOKE_CLICK: comma-separated selectors to click in the dashboard first, e.g. to open a section.
+    for (const selector of (process.env.THQ_SMOKE_CLICK ?? '').split(',').filter(Boolean)) {
+      await host.windows().find(([name]) => name === 'dashboard')?.[1].webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)})?.click()`);
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
     for (const spec of (process.env.THQ_SMOKE_FRAMES ?? '').split(',').filter(Boolean)) {
       const [label, count, interval, action] = spec.split(':');
       const win = host.windows().find(([name]) => name === label)?.[1];

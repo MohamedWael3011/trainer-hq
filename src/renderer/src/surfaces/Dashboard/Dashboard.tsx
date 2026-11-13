@@ -13,6 +13,7 @@ import Lab from '../../views/Lab/Lab';
 import Settings from '../../views/Settings/Settings';
 import Onboarding from '../../views/Onboarding/Onboarding';
 import { renderIf } from '../../lib/renderIf';
+import { needsYou } from '@shared/needsYou';
 import './styles.css';
 
 const RING_RADIUS = 7;
@@ -27,16 +28,20 @@ const PlanRing = ({ state, onOpen }: { state: AppStateType; onOpen: () => void }
   const usage = state.usage;
   if (!usage || usage.fiveHour === undefined) return null;
   const value = Math.min(1, Math.max(0, usage.fiveHour));
-  const level = value >= RING_HIGH ? 'high' : value >= RING_WARN ? 'warn' : 'ok';
+  const forecast = usage.hitsLimitAt;
+  // Running out before the reset is worth a warning even while the ring is still low.
+  const level = value >= RING_HIGH ? 'high' : value >= RING_WARN || forecast ? 'warn' : 'ok';
   const resets = usage.resetsAt && usage.resetsAt > Date.now() ? ` · resets ${clock(usage.resetsAt)}` : '';
   const weekly = usage.sevenDay !== undefined ? ` · 7-day ${Math.round(usage.sevenDay * 100)}%` : '';
   return (
-    <button className={`dash-plan dash-plan-${level}`} onClick={onOpen} title={`5-hour plan usage ${Math.round(value * 100)}%${weekly}${resets}`}>
+    <button className={`dash-plan dash-plan-${level}`} onClick={onOpen} title={`5-hour plan usage ${Math.round(value * 100)}%${weekly}${resets}${forecast ? ` · at this pace it runs out around ${clock(forecast)}` : ''}`}>
       <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
         <circle cx="9" cy="9" r={RING_RADIUS} className="dash-plan-track" />
         <circle cx="9" cy="9" r={RING_RADIUS} className="dash-plan-fill" strokeDasharray={`${value * RING_LENGTH} ${RING_LENGTH}`} transform="rotate(-90 9 9)" />
       </svg>
       <span>{Math.round(value * 100)}%</span>
+      {renderIf(!!forecast, <span className="dash-plan-forecast">out ~{clock(forecast ?? 0)}</span>)}
+      {renderIf(!!state.backupAccountUntil, <span className="dash-plan-backup" title={`Main account is at its plan limit; chats use the backup account until ${clock(state.backupAccountUntil ?? 0)}`}>backup until {clock(state.backupAccountUntil ?? 0)}</span>)}
     </button>
   );
 };
@@ -127,7 +132,7 @@ const Dashboard = ({ state }: PropsType) => {
   const auditor = state.creatures.find((creature) => creature.skills.includes(AUDITOR_SKILL));
 
   const counts: Partial<Record<ViewType, number>> = {
-    [View.QUESTS]: state.approvals.length + state.quests.filter((quest) => quest.status === QuestStatus.RUNNING).length,
+    [View.QUESTS]: needsYou(state).total + state.quests.filter((quest) => quest.status === QuestStatus.RUNNING).length,
     [View.DAYCARE]: state.daycare.length,
   };
 

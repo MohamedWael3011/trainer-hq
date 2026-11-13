@@ -63,6 +63,8 @@ export class UsageLedger {
   private saveTimer: NodeJS.Timeout | undefined;
 
   load(profileId: string): void {
+    // A switch of profile must not drop the previous profile's unsaved spend.
+    this.flush();
     const dir = profileHome(profileId);
     mkdirSync(dir, { recursive: true });
     this.file = join(dir, LEDGER_FILE);
@@ -75,9 +77,15 @@ export class UsageLedger {
 
   private persist(): void {
     if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
-      if (this.file) writeFileSync(this.file, JSON.stringify(this.days));
-    }, SAVE_DELAY_MS);
+    this.saveTimer = setTimeout(() => this.flush(), SAVE_DELAY_MS);
+  }
+
+  // Writes any pending spend now. Called on quit, where the delayed save would never run.
+  flush(): void {
+    if (!this.saveTimer) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = undefined;
+    if (this.file) writeFileSync(this.file, JSON.stringify(this.days));
   }
 
   record(creatureId: string, run: LedgerRunType, at = Date.now()): void {
@@ -96,7 +104,7 @@ export class UsageLedger {
       entry.costUsd += run.usage.costUsd ?? 0;
       entry.compactions += run.usage.compactions ?? 0;
     }
-    const oldest = dayKey(Date.now() - KEEP_DAYS * MS_PER_DAY);
+    const oldest = dayKey(at - KEEP_DAYS * MS_PER_DAY);
     Object.keys(this.days).filter((name) => name < oldest).forEach((name) => delete this.days[name]);
     this.persist();
   }

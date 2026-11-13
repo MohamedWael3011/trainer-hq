@@ -10,6 +10,7 @@ import { isLookup, resolveModel } from '../src/main/routing';
 import { ScheduleStore, nextRun } from '../src/main/schedules';
 import { scanTerminalSessions, terminalSessionRecap } from '../src/main/sessionWatch';
 import { listTemplates } from '../src/main/templates';
+import { forecastLimitAt } from '../src/main/limits';
 import type { CreatureType } from '@shared/types';
 
 const DAY_MS = 86_400_000;
@@ -129,6 +130,16 @@ describe('usage ledger', () => {
     expect(report.byDay[29].costUsd).toBe(1.5);
   });
 
+  it('writes pending spend at once on flush, and keeps it across a reload', () => {
+    const ledger = new UsageLedger();
+    ledger.load('flushed');
+    ledger.record('scout', { usage, handoff: false, freshSession: false, coldReset: false });
+    ledger.flush();
+    const reloaded = new UsageLedger();
+    reloaded.load('flushed');
+    expect(reloaded.spentSince('scout', 7)).toBe(1.5);
+  });
+
   it('lists a budgeted creature before it has run anything', () => {
     const ledger = new UsageLedger();
     ledger.load('main');
@@ -237,5 +248,23 @@ describe('quest templates', () => {
       { name: 'qa-guide', description: 'Testing guide', kind: 'template', prompt: 'Write a testing guide.' },
     ]);
     expect(listTemplates(join(vault, 'missing'))).toEqual([]);
+  });
+});
+
+describe('plan limit forecast', () => {
+  const MIN = 60_000;
+  const now = 1_000 * MIN;
+
+  it('projects when the window runs out from the recent climb', () => {
+    const samples = [{ at: now - 30 * MIN, fiveHour: 0.4 }, { at: now, fiveHour: 0.6 }];
+    expect(forecastLimitAt(samples, now + 120 * MIN, now)).toBe(now + 60 * MIN);
+  });
+
+  it('says nothing when the reset comes first, usage is flat, or there is too little to go on', () => {
+    const climbing = [{ at: now - 30 * MIN, fiveHour: 0.4 }, { at: now, fiveHour: 0.6 }];
+    expect(forecastLimitAt(climbing, now + 30 * MIN, now)).toBeUndefined();
+    expect(forecastLimitAt([{ at: now - 30 * MIN, fiveHour: 0.5 }, { at: now, fiveHour: 0.5 }], undefined, now)).toBeUndefined();
+    expect(forecastLimitAt([{ at: now - 2 * MIN, fiveHour: 0.2 }, { at: now, fiveHour: 0.5 }], undefined, now)).toBeUndefined();
+    expect(forecastLimitAt([{ at: now - 120 * MIN, fiveHour: 0.1 }, { at: now, fiveHour: 0.5 }], undefined, now)).toBeUndefined();
   });
 });

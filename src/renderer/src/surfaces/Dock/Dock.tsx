@@ -5,6 +5,7 @@ import Sprite from '../../components/Sprite/Sprite';
 import RouteCanvas from '../../components/RouteCanvas/RouteCanvas';
 import { renderIf } from '../../lib/renderIf';
 import { creatureName, isLive } from '../../lib/format';
+import { needsYou, reviewQueue } from '@shared/needsYou';
 import './styles.css';
 
 type PropsType = {
@@ -24,6 +25,8 @@ const bubbleFor = (state: AppStateType, creatureId: string): string | null => {
   const latest = quests.find((quest) => quest.creatureId === creatureId);
   if (!latest) return null;
   if (latest.status === QuestStatus.WAITING) return 'Needs you';
+  const reviews = reviewQueue(quests).filter((quest) => quest.creatureId === creatureId).length;
+  if (reviews > 0 && !isLive(latest)) return reviews === 1 ? 'Review me' : `Review ${reviews}`;
   const recent = latest.endedAt !== undefined && Date.now() - latest.endedAt < RECENT_MS;
   if (recent && latest.status === QuestStatus.DONE) return 'Done!';
   if (recent && latest.status === QuestStatus.FAILED) return 'Help';
@@ -104,6 +107,7 @@ const Dock = ({ state }: PropsType) => {
     void window.hq.setDockHidden(true);
   }, []);
 
+  const waiting = needsYou(state);
   const pillCreature = live[0]?.creatureId ?? walkers[0]?.id ?? SLEEPER_ID;
 
   return (
@@ -118,7 +122,7 @@ const Dock = ({ state }: PropsType) => {
       >
         <Sprite state={state} id={pillCreature} className="dock-pill-sprite" />
         <span className="dock-pill-count">{anyLive ? `${live.length} running` : 'idle'}</span>
-        {renderIf(state.approvals.length > 0, <span className="dock-pill-alert">{state.approvals.length}!</span>)}
+        {renderIf(waiting.total > 0, <span className="dock-pill-alert" title={`${waiting.approvals} approvals, ${waiting.reviews} to review`}>{waiting.total}!</span>)}
       </button>
       <button className="dock-pill-close" onMouseEnter={() => setInteractive(true)} onMouseLeave={() => setInteractive(false)} onClick={hideDock} title="Hide dock (bring back with ⌥⇧Space)" aria-label="Hide route dock" tabIndex={minimized ? 0 : -1}>×</button>
       <div className="dock" onMouseEnter={() => setInteractive(true)} onMouseLeave={() => setInteractive(false)}>
@@ -146,7 +150,7 @@ const Dock = ({ state }: PropsType) => {
             return (
               <button
                 key={creature.id}
-                className={`walker lane-${index}`}
+                className={`walker lane-${index}${waiting.creatureIds.has(creature.id) ? ' walker-needs' : ''}`}
                 title={`${creature.name} · ${creature.role}`}
                 onClick={() => void window.hq.openDashboard(creature.id)}
               >

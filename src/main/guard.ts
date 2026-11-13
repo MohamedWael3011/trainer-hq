@@ -144,6 +144,8 @@ export const planClaudeRun = (options: {
   sessionName?: string;
   context?: RunContextType;
   floorTokens?: number;
+  // Nobody is there to answer an approval, so askBeyondLimits must not apply.
+  unattended?: boolean;
 }): ClaudeRunPlanType => {
   const { creature, profile, systemPrompt, bridge, resumeSessionId, questId, skipWorktree, sessionName } = options;
   const supports = options.supports ?? (() => true);
@@ -151,7 +153,7 @@ export const planClaudeRun = (options: {
   const context = options.context ?? { artifacts: true, slashCommands: true, connectors: true };
   const allow = context.artifacts ? creature.tools.allow : creature.tools.allow.filter((rule) => !ARTIFACT_TOOL.test(rule));
   const compactWindow = autocompactWindow(profile.session.autocompactTokens, options.floorTokens);
-  const askBeyondLimits = profile.guard.askBeyondLimits && supports(SETTINGS_FLAG);
+  const askBeyondLimits = profile.guard.askBeyondLimits && !options.unattended && supports(SETTINGS_FLAG);
   const limits = [...profile.guard.alwaysDeny, ...creature.tools.deny];
   const deny = askBeyondLimits ? [] : limits;
   const ask = [...creature.tools.ask, ...(askBeyondLimits ? limits : [])];

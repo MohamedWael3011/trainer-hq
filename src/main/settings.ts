@@ -31,6 +31,7 @@ export const readSettings = (vault: string): ProfileSettingsType => {
     name: text(data.name, 'Trainer'),
     vault,
     claudeConfigDir: text(data.claudeConfigDir),
+    limitFallbackConfigDir: text(data.limitFallbackConfigDir),
     repos: Object.entries(record(data.repos)).map(([name, path]) => ({ name, path: text(path) })),
     engines,
     guard: {
@@ -69,6 +70,8 @@ export const writeSettings = (vault: string, settings: ProfileSettingsType): voi
   doc.set('name', settings.name.trim() || 'Trainer');
   if (settings.claudeConfigDir.trim()) doc.set('claudeConfigDir', settings.claudeConfigDir.trim());
   else doc.delete('claudeConfigDir');
+  if (settings.limitFallbackConfigDir.trim()) doc.set('limitFallbackConfigDir', settings.limitFallbackConfigDir.trim());
+  else doc.delete('limitFallbackConfigDir');
   doc.set('repos', Object.fromEntries(settings.repos.filter((repo) => repo.name.trim() && repo.path.trim()).map((repo) => [repo.name.trim(), repo.path.trim()])));
   doc.set('engines', Object.fromEntries(settings.engines.filter((engine) => engine.name.trim()).map((engine) => [
     engine.name.trim(),

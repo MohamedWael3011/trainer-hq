@@ -103,6 +103,14 @@ const Settings = ({ state, onRestartOnboarding }: PropsType) => {
           </div>
           <small className="faint">Only for a second Claude account. Setting it to ~/.claude makes Claude look for a different login, so leave it empty for the default.</small>
         </label>
+        <label className="settings-field">
+          <span>Backup account at the plan limit (optional)</span>
+          <div className="settings-inline">
+            <input value={draft.limitFallbackConfigDir} placeholder="e.g. ~/.claude-personal" onChange={(event) => update((current) => ({ ...current, limitFallbackConfigDir: event.target.value }))} spellCheck={false} />
+            <button className="btn sm" onClick={() => void pick(draft.limitFallbackConfigDir, (path) => update((current) => ({ ...current, limitFallbackConfigDir: path })))}>Choose…</button>
+          </div>
+          <small className="faint">The Claude config folder of another signed-in account (~/.claude is your normal login). When this profile's account hits its plan limit, chats continue there in a fresh session with a short recap, and come back once the limit resets. Sign it in first with CLAUDE_CONFIG_DIR=that-folder claude auth login.</small>
+        </label>
       </div>
 
       <div className="panel settings-block">
@@ -139,7 +147,7 @@ const Settings = ({ state, onRestartOnboarding }: PropsType) => {
           <label className="settings-field"><span>Don't start above this 5-hour plan usage (%)</span><input type="number" min={1} max={100} value={Math.round(draft.guard.maxPlanUsage * PERCENT)} onChange={(event) => update((current) => ({ ...current, guard: { ...current.guard, maxPlanUsage: (Number(event.target.value) || 1) / PERCENT } }))} /></label>
         </div>
         <label className="settings-check"><input type="checkbox" checked={draft.guard.worktree} onChange={(event) => update((current) => ({ ...current, guard: { ...current.guard, worktree: event.target.checked } }))} /><span>Give a full-auto quest its own git worktree when another quest is already working in the same repo</span></label>
-        <label className="settings-check"><input type="checkbox" checked={draft.guard.askBeyondLimits} onChange={(event) => update((current) => ({ ...current, guard: { ...current.guard, askBeyondLimits: event.target.checked } }))} /><span>Ask me instead of refusing when a creature needs something a deny list blocks (the built-in list, the rules below, or the creature's own)</span></label>
+        <label className="settings-check"><input type="checkbox" checked={draft.guard.askBeyondLimits} onChange={(event) => update((current) => ({ ...current, guard: { ...current.guard, askBeyondLimits: event.target.checked } }))} /><span>Ask me instead of refusing when a creature needs something a deny list blocks (the built-in list, the rules below, or the creature's own). Recurring quests run unattended, so they are still refused.</span></label>
         <label className="settings-field">
           <span>Extra always-deny rules (one per line, Claude Code permission syntax)</span>
           <textarea rows={4} value={draft.guard.alwaysDeny.join('\n')} onChange={(event) => update((current) => ({ ...current, guard: { ...current.guard, alwaysDeny: event.target.value.split('\n') } }))} spellCheck={false} />

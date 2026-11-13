@@ -58,6 +58,10 @@ A short onboarding checks your tools, sets up your vault and repos, and introduc
 | **Creatures** | Specialists defined by a `creature.yaml` and a `brain/` folder. Five original starters: Scout, Scribe, Reviewer, Pixel and Sage. |
 | **Hatching** | Describe a new creature in plain words; it researches your repos read-only and writes its own folder. |
 | **Threads** | Several contexts per creature, each its own Claude session; point one at a branch or PR and it works in an isolated worktree. |
+| **Recurring quests** | "Do this every morning" becomes a schedule (hourly, daily, weekdays, weekly) in its own thread, set from the Quests tab or by the creature itself. Each run starts a fresh session with a short recap of the last one. A run is skipped, with a notification, when the previous one is still going or the creature is over its weekly budget. Deny lists are always refused in these runs, even with **Ask me instead of refusing** on, since nobody is there to approve. |
+| **Review inbox** | Finished quests that changed files outside the vault wait under **Quests → To review** with a diff of each file against the last commit. **Approve**, **Follow up** in the chat, or **Discard**, which puts the files back to the last commit and moves new files to the Trash. |
+| **Needs you** | Pending approvals and reviews show as a count on the dock pill and the notch, and the creature they belong to hops with a pink bubble until you deal with it. |
+| **Limit forecast & backup account** | The plan ring warns when, at the pace of the last 45 minutes, the 5-hour window runs out before it resets. Set `limitFallbackConfigDir` (or **Settings → Backup account**) to a second signed-in Claude account, and chats that hit the limit continue there in a fresh session with a recap, then move back once the main account resets. |
 | **Handoffs** | `ask_creature`: creatures call teammates and get answers back, with chain limits and timeouts. |
 | **Autonomy + guard** | Ask / auto-edit / full auto. Full auto keeps a deny list, a time limit and worktrees, and pauses near your plan's usage limit. |
 | **Tiered brain + Day Care** | Core rules (`01-workspace.md`, `how-i-work.md`, or `tier: hot`) stay inline; deeper domain notes and `## Learned` history are indexed with section line ranges and pulled on demand. Day Care proposes new notes for free at the end of each chat. |
@@ -65,7 +69,7 @@ A short onboarding checks your tools, sets up your vault and repos, and introduc
 | **Slash commands & skills** | Type `/` in a chat to see the commands and skills that creature can run, with what each one does. A command you send shows its description, and a skill a creature runs shows as its own card. |
 | **Files a creature makes** | Renders, screenshots, HTML pages and PDFs a creature creates during a reply (named in its tool output or written by it, such as a render harness's `shots-*` folder) show as a card under the reply: thumbnails, where they were saved, **Open folder**, and a full-size preview. Background commands show as their own card. |
 | **Artifacts** | Claude creatures can publish claude.ai Artifacts (`Artifact`, `ArtifactData`, `ArtifactComments`), which headless Claude Code leaves out by default. They load for creatures that list `Artifact` under `tools.allow` or have Artifacts switched on in the Dex, since the tools cost about 13k tokens per session. |
-| **Engines, models & cost** | Claude Code and Antigravity (`agy`) with model & effort pickers, plan-use labels, and per-reply token/cache/cost badges under every quest; any other CLI agent plugs in through a generic adapter. |
+| **Engines, models & cost** | Claude Code and Antigravity (`agy`) with model & effort pickers, plan-use labels, and per-reply token/cache/cost badges under every quest; any other CLI agent (Gemini CLI, Codex) plugs in through a generic adapter. |
 | **Attachments** | Drop or paste files: their paths go into the message, zips are unpacked, and skill zips install in one click. |
 | **Usage and budgets** | The Trainer tab shows tokens, cache share, cost, compactions and cold restarts per creature for the last 30 days. Give a creature a weekly budget in the Dex and new quests pause once it is spent. |
 | **Lean sessions** | Each creature loads only what it uses: Artifacts, the skills listing and connectors are switches in the Dex (about 13k, 5k and 4k tokens per session). A chat that keeps auto-compacting without freeing much is stopped instead of paying to summarize in a loop. Helper agents run on `session.lightModel` instead of Opus, and command output is capped at 16k characters per call (`BASH_MAX_OUTPUT_LENGTH` under `env:` changes it). |
@@ -275,6 +279,7 @@ Everything is editable in **Settings**, which writes your vault's `profile.yaml`
 ```yaml
 name: My Party
 claudeConfigDir: ~/.claude-personal   # optional: only for a second Claude account
+limitFallbackConfigDir: ~/.claude      # optional: another signed-in account to continue on at the plan limit
 spriteOverrides: sprites/overrides
 
 repos:
@@ -288,6 +293,10 @@ engines:
     adapter: cli
     bin: gemini
     args: ["-p", "{prompt}"]          # {prompt} and {system} are substituted; without {prompt} the prompt goes to stdin
+  codex:
+    adapter: cli
+    bin: codex
+    args: ["exec", "--skip-git-repo-check", "{prompt}"]
 
 guard:
   fullAuto:

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { NOTCH_TARGET_KEY, Surface } from '@shared/constants';
+import { NOTCH_TARGET_KEY, Surface, View } from '@shared/constants';
+import { needsYou } from '@shared/needsYou';
 import type { AppStateType, QuestType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import { LiveBadge } from '../../components/LiveStatus/LiveStatus';
@@ -66,6 +67,7 @@ const Notch = ({ state }: PropsType) => {
     const current = Math.max(0, ids.indexOf(defaultCreature));
     pickTarget(ids[(current + step + ids.length) % ids.length]);
   }, [state.creatures, defaultCreature, pickTarget]);
+  const waiting = needsYou(state);
   const peekCreature = live[0]?.creatureId ?? defaultCreature;
 
   useEffect(() => {
@@ -145,7 +147,7 @@ const Notch = ({ state }: PropsType) => {
           </span>
           <span className="notch-gap" />
           <span className="notch-wing notch-wing-right">
-            <span className="notch-live"><i />{live.length}{state.approvals.length > 0 ? ` · ${state.approvals.length}!` : ''}</span>
+            <span className={`notch-live${waiting.total > 0 ? ' notch-live-needs' : ''}`} title={`${live.length} running · ${waiting.approvals} approvals · ${waiting.reviews} to review`}><i />{live.length}{waiting.total > 0 ? ` · ${waiting.total}!` : ''}</span>
           </span>
         </div>
         <div className="notch-drop">
@@ -194,6 +196,11 @@ const Notch = ({ state }: PropsType) => {
               <ApprovalCard state={state} approval={approval} compact />
             </div>
           ) : null)}
+          {renderIf(!approval && waiting.reviews > 0, (
+            <button className="notch-review" onClick={() => void window.hq.openDashboard(undefined, View.QUESTS)}>
+              {waiting.reviews === 1 ? '1 finished quest changed files' : `${waiting.reviews} finished quests changed files`} · Review
+            </button>
+          ))}
           {renderIf(!approval, (
             <div className="notch-rows">
               {recent.map((quest) => (

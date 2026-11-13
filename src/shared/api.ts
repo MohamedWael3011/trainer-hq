@@ -1,6 +1,8 @@
 import type { AutonomyType, SurfaceType } from './constants';
 import type { SignInKindType } from './signIn';
 import type {
+  ReviewFileType,
+  ReviewDecisionType,
   DisplayInfoType,
   CommandInfoType,
   AppStateType,
@@ -90,7 +92,7 @@ export type HqApiType = {
   labCancel: (jobId: string) => Promise<void>;
   labFreeSpace: (workspaceId: string) => Promise<void>;
   openLogin: () => Promise<void>;
-  openDashboard: (creatureId?: string) => Promise<void>;
+  openDashboard: (creatureId?: string, view?: string) => Promise<void>;
   setInteractive: (surface: SurfaceType, interactive: boolean) => Promise<void>;
   openPath: (target?: string) => Promise<string>;
   signIn: (kind: SignInKindType) => Promise<void>;
@@ -105,4 +107,6 @@ export type HqApiType = {
   deleteSchedule: (id: string) => Promise<void>;
   runSchedule: (id: string) => Promise<void>;
   adoptSession: (request: SessionAdoptRequestType) => Promise<string>;
+  reviewFiles: (questId: string) => Promise<ReviewFileType[]>;
+  decideReview: (decision: ReviewDecisionType) => Promise<string[]>;
 };

@@ -48,3 +48,5 @@
 .dash-plan-warn .dash-plan-fill { stroke: var(--amber); }
 .dash-plan-high .dash-plan-fill { stroke: var(--red); }
 .dash-plan-high { color: var(--red); }
+.dash-plan-forecast { color: var(--amber); }
+.dash-plan-backup { color: var(--violet); }
