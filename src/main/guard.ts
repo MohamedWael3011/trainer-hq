@@ -7,6 +7,7 @@ import type { ProfileConfigType } from './config';
 import { pushIfSupported, type FlagSupportType } from './engines/claudeFlags';
 
 const MS_PER_MINUTE = 60_000;
+const SETTINGS_FLAG = '--settings';
 
 export type ClaudeRunPlanType = {
   args: string[];
@@ -138,7 +139,9 @@ export const planClaudeRun = (options: {
   const { creature, profile, systemPrompt, bridge, resumeSessionId, questId, skipWorktree, sessionName } = options;
   const supports = options.supports ?? (() => true);
   const fullAuto = creature.autonomy === Autonomy.FULL_AUTO;
-  const deny = [...profile.guard.alwaysDeny, ...creature.tools.deny];
+  const askBeyondLimits = profile.guard.askBeyondLimits && supports(SETTINGS_FLAG);
+  const deny = [...profile.guard.alwaysDeny, ...(askBeyondLimits ? [] : creature.tools.deny)];
+  const ask = [...creature.tools.ask, ...(askBeyondLimits ? creature.tools.deny : [])];
   const sharedDir = join(profile.vault, 'shared');
   const nestedRepos = subRepos(creature.cwd);
   const droppedLegacySession = nestedRepos.length > 0 && isWorktreeSession(resumeSessionId, profile.claudeConfigDir);
@@ -179,7 +182,8 @@ export const planClaudeRun = (options: {
   }
   if (fullAuto && profile.guard.fullAutoMaxBudgetUsd) pushIfSupported(args, supports, '--max-budget-usd', String(profile.guard.fullAutoMaxBudgetUsd));
   args.push('--allowedTools', ...creature.tools.allow, `mcp__${MCP_SERVER_NAME}__${ASK_TOOL}`);
-  args.push('--disallowedTools', ...deny);
+  if (deny.length > 0) args.push('--disallowedTools', ...deny);
+  if (ask.length > 0) pushIfSupported(args, supports, SETTINGS_FLAG, JSON.stringify({ permissions: { ask } }));
   return {
     args,
     timeoutMs: fullAuto ? profile.guard.fullAutoMaxMinutes * MS_PER_MINUTE : undefined,

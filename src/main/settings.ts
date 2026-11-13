@@ -39,6 +39,7 @@ export const readSettings = (vault: string): ProfileSettingsType => {
       worktree: fullAuto.worktree !== false,
       alwaysDeny: Array.isArray(guard.alwaysDeny) ? guard.alwaysDeny.map(String) : [],
       builtInDeny: DEFAULT_ALWAYS_DENY,
+      askBeyondLimits: guard.askBeyondLimits === true,
     },
     daycare: {
       mode: toDaycareMode(daycare),
@@ -78,6 +79,7 @@ export const writeSettings = (vault: string, settings: ProfileSettingsType): voi
   doc.setIn(['guard', 'fullAuto', 'maxMinutes'], settings.guard.maxMinutes);
   doc.setIn(['guard', 'fullAuto', 'maxPlanUsage'], settings.guard.maxPlanUsage);
   doc.setIn(['guard', 'fullAuto', 'worktree'], settings.guard.worktree);
+  doc.setIn(['guard', 'askBeyondLimits'], settings.guard.askBeyondLimits);
   doc.setIn(['guard', 'alwaysDeny'], settings.guard.alwaysDeny.map((rule) => rule.trim()).filter(Boolean));
   doc.setIn(['daycare', 'mode'], settings.daycare.mode);
   if (doc.hasIn(['daycare', 'autoPropose'])) doc.deleteIn(['daycare', 'autoPropose']);

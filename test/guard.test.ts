@@ -31,6 +31,36 @@ describe('planClaudeRun', () => {
   });
 });
 
+describe('creature limits', () => {
+  const limited = { ...creature, tools: { allow: ['Read'], ask: ['Bash(git commit:*)'], deny: ['Write'] } } as unknown as CreatureType;
+  const argsFor = (askBeyondLimits: boolean, supports?: (flag: string) => boolean) =>
+    planClaudeRun({
+      creature: limited,
+      profile: { ...profile, guard: { ...profile.guard, alwaysDeny: ['Bash(sudo:*)'], askBeyondLimits } } as unknown as ProfileConfigType,
+      systemPrompt: 'hi', bridge, questId: 'quest-1234', supports,
+    }).args;
+  const askRules = (args: string[]) => JSON.parse(args[args.indexOf('--settings') + 1]).permissions.ask;
+  const denyRules = (args: string[]) => args.slice(args.indexOf('--disallowedTools') + 1).filter((arg, index, rest) => !rest.slice(0, index + 1).includes('--settings') && rest[index - 1] !== '--settings');
+
+  it('refuses what the creature denies by default, and still asks for its ask rules', () => {
+    const args = argsFor(false);
+    expect(denyRules(args)).toEqual(['Bash(sudo:*)', 'Write']);
+    expect(askRules(args)).toEqual(['Bash(git commit:*)']);
+  });
+
+  it('asks instead of refusing when the profile says so, but keeps the profile deny list', () => {
+    const args = argsFor(true);
+    expect(denyRules(args)).toEqual(['Bash(sudo:*)']);
+    expect(askRules(args)).toEqual(['Bash(git commit:*)', 'Write']);
+  });
+
+  it('keeps refusing on a CLI that cannot take ask rules', () => {
+    const args = argsFor(true, () => false);
+    expect(denyRules(args)).toEqual(['Bash(sudo:*)', 'Write']);
+    expect(args).not.toContain('--settings');
+  });
+});
+
 describe('fallbackModel', () => {
   it('falls back to the lighter model only from heavier ones', () => {
     expect(fallbackModel(undefined, 'sonnet')).toBe('sonnet');

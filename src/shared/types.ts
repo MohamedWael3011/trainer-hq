@@ -329,7 +329,7 @@ export type ProfileSettingsType = {
   claudeConfigDir: string;
   repos: { name: string; path: string }[];
   engines: { name: string; adapter: EngineAdapterType; bin: string; args: string[] }[];
-  guard: { maxMinutes: number; maxPlanUsage: number; worktree: boolean; alwaysDeny: string[]; builtInDeny: string[] };
+  guard: { maxMinutes: number; maxPlanUsage: number; worktree: boolean; alwaysDeny: string[]; builtInDeny: string[]; askBeyondLimits: boolean };
   daycare: { mode: DaycareModeType; autoApproveFullAuto: boolean };
   env: { key: string; value: string }[];
   lab: {

@@ -25,6 +25,7 @@ guard:
     worktree: true
     # maxBudgetUsd: 10    # optional: stop an unattended run once its estimated API cost passes this
   alwaysDeny: []
+  askBeyondLimits: false  # true: ask you when a creature needs something its own deny list blocks, instead of refusing
 
 # Every tool call resends the whole conversation, so long sessions burn tokens fast.
 session:

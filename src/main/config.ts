@@ -17,6 +17,7 @@ export type GuardConfigType = {
   fullAutoWorktree: boolean;
   fullAutoMaxBudgetUsd?: number;
   alwaysDeny: string[];
+  askBeyondLimits: boolean;
 };
 
 // Keeps Claude sessions small: every tool call resends the whole conversation, so a long-lived session
@@ -246,6 +247,7 @@ export const loadProfileConfig = (vaultSetting: string): ProfileConfigType => {
       fullAutoWorktree: fullAuto.worktree !== false,
       fullAutoMaxBudgetUsd: Number(fullAuto.maxBudgetUsd) > 0 ? Number(fullAuto.maxBudgetUsd) : undefined,
       alwaysDeny: [...DEFAULT_ALWAYS_DENY, ...((guard.alwaysDeny ?? []) as string[])],
+      askBeyondLimits: guard.askBeyondLimits === true,
     },
     session: toSession(data.session),
     daycareMode: toDaycareMode(daycare),
