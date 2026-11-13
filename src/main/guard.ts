@@ -140,8 +140,9 @@ export const planClaudeRun = (options: {
   const supports = options.supports ?? (() => true);
   const fullAuto = creature.autonomy === Autonomy.FULL_AUTO;
   const askBeyondLimits = profile.guard.askBeyondLimits && supports(SETTINGS_FLAG);
-  const deny = [...profile.guard.alwaysDeny, ...(askBeyondLimits ? [] : creature.tools.deny)];
-  const ask = [...creature.tools.ask, ...(askBeyondLimits ? creature.tools.deny : [])];
+  const limits = [...profile.guard.alwaysDeny, ...creature.tools.deny];
+  const deny = askBeyondLimits ? [] : limits;
+  const ask = [...creature.tools.ask, ...(askBeyondLimits ? limits : [])];
   const sharedDir = join(profile.vault, 'shared');
   const nestedRepos = subRepos(creature.cwd);
   const droppedLegacySession = nestedRepos.length > 0 && isWorktreeSession(resumeSessionId, profile.claudeConfigDir);

@@ -48,10 +48,10 @@ describe('creature limits', () => {
     expect(askRules(args)).toEqual(['Bash(git commit:*)']);
   });
 
-  it('asks instead of refusing when the profile says so, but keeps the profile deny list', () => {
+  it('asks instead of refusing anything when the profile says so', () => {
     const args = argsFor(true);
-    expect(denyRules(args)).toEqual(['Bash(sudo:*)']);
-    expect(askRules(args)).toEqual(['Bash(git commit:*)', 'Write']);
+    expect(args).not.toContain('--disallowedTools');
+    expect(askRules(args)).toEqual(['Bash(git commit:*)', 'Bash(sudo:*)', 'Write']);
   });
 
   it('keeps refusing on a CLI that cannot take ask rules', () => {
