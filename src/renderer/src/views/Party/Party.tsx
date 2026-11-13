@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
-import { AttachmentKind, CommandKind, EngineAdapter, QuestKind } from '@shared/constants';
+import { AttachmentKind, CommandKind, EngineAdapter, QuestKind, ThreadKind } from '@shared/constants';
 import type { AppStateType, AttachmentInfoType, CommandInfoType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
@@ -7,6 +7,7 @@ import QuestLog from '../../components/QuestLog/QuestLog';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
 import AttachmentChip from '../../components/AttachmentChip/AttachmentChip';
 import ThreadSheet from '../ThreadSheet/ThreadSheet';
+import ChatHistory from '../../components/ChatHistory/ChatHistory';
 import CreatureControls from '../../components/CreatureControls/CreatureControls';
 import { renderIf } from '../../lib/renderIf';
 import { useQuestLive } from '../../hooks/useQuestLive';
@@ -49,15 +50,25 @@ const Party = ({ state, creatureId }: PropsType) => {
   const [dragging, setDragging] = useState(false);
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const [creatingThread, setCreatingThread] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const threads = useMemo(
-    () => state.threads.filter((thread) => thread.creatureId === creatureId && !thread.archived).sort((a, b) => a.createdAt - b.createdAt),
+    () => state.threads
+      .filter((thread) => thread.creatureId === creatureId && !thread.archived)
+      .sort((a, b) => Number(a.kind === ThreadKind.RECURRING) - Number(b.kind === ThreadKind.RECURRING) || a.createdAt - b.createdAt),
     [state.threads, creatureId],
   );
+  const pastCount = useMemo(() => state.threads.filter((entry) => entry.creatureId === creatureId && entry.archived).length, [state.threads, creatureId]);
   const thread = threads.find((entry) => entry.id === threadId);
 
   useEffect(() => {
     setThreadId(undefined);
+    setHistoryOpen(false);
   }, [creatureId]);
+  const openPast = useCallback((id: string) => {
+    setHistoryOpen(false);
+    void window.hq.restoreThread(id).then(() => setThreadId(id));
+  }, []);
+  const closeHistory = useCallback(() => setHistoryOpen(false), []);
   const dragDepth = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -288,63 +299,47 @@ const Party = ({ state, creatureId }: PropsType) => {
         </div>
       </header>
       <div className="party-threads">
-        <div className="party-tabs" role="tablist" aria-label="Threads">
-          <button role="tab" aria-selected={!threadId} className="party-tab" onClick={() => setThreadId(undefined)}>Main</button>
-          {threads.map((entry) => {
-            const liveHere = state.quests.some((quest) => quest.threadId === entry.id && isLive(quest));
-            return (
-              <button key={entry.id} role="tab" aria-selected={threadId === entry.id} className="party-tab" onClick={() => setThreadId(entry.id)} title={entry.cwd ?? entry.title}>
-                {renderIf(liveHere, <i className="party-tab-live" />)}
-                <span className="party-tab-title">{entry.title}</span>
-              </button>
-            );
-          })}
-          <button className="party-tab party-tab-add" onClick={() => setCreatingThread(true)}>+ Thread</button>
-          {renderIf(!thread && canCompact, (
-            <button
-              className="btn sm ghost party-clear-btn"
-              onClick={() => void window.hq.openThreadInTerminal(creature.id)}
-              title="Continue this chat in Claude Code in Terminal (same session)"
-            >
-              Terminal
-            </button>
-          ))}
-          {renderIf(!thread && canCompact, (
-            <button
-              className="btn sm ghost party-clear-btn"
-              onClick={() => void window.hq.compactThread(creature.id)}
-              title="Summarize this chat in place (Claude Code /compact): keeps the context, costs less per step"
-            >
-              Compact
-            </button>
-          ))}
-          {renderIf(!thread && quests.length > 0, (
-            <button
-              className="btn sm ghost party-clear-btn"
-              onClick={() => void window.hq.clearThread(creature.id)}
-              title="Clear Main chat history and start a fresh session"
-            >
-              Clear
+        <div className="party-tabs-row">
+          <div className="party-tabs" role="tablist" aria-label="Threads">
+            <button role="tab" aria-selected={!threadId} className="party-tab" onClick={() => setThreadId(undefined)}>Main</button>
+            {threads.map((entry) => {
+              const liveHere = state.quests.some((quest) => quest.threadId === entry.id && isLive(quest));
+              const recurring = entry.kind === ThreadKind.RECURRING;
+              return (
+                <button key={entry.id} role="tab" aria-selected={threadId === entry.id} className="party-tab" onClick={() => setThreadId(entry.id)} title={recurring ? `Recurring quest: ${entry.title}` : entry.cwd ?? entry.title}>
+                  {renderIf(liveHere, <i className="party-tab-live" />)}
+                  {renderIf(recurring, <span className="party-tab-kind" aria-hidden="true">↻</span>)}
+                  <span className="party-tab-title">{entry.title}</span>
+                </button>
+              );
+            })}
+            <button className="party-tab party-tab-add" onClick={() => setCreatingThread(true)}>+ Thread</button>
+          </div>
+          {renderIf(pastCount > 0, (
+            <button className="btn sm ghost party-history-btn" aria-expanded={historyOpen} onClick={() => setHistoryOpen((open) => !open)} title="Cleared and archived chats. Reopen one to continue it.">
+              History · {pastCount}
             </button>
           ))}
         </div>
-        {renderIf(!!thread, thread ? (
+        {renderIf(!!thread || quests.length > 0, (
           <div className="party-thread-info">
-            {renderIf(!!thread.repo, <Badge>{thread.repo}</Badge>)}
-            {renderIf(!!thread.branch, <Badge>{thread.branch}</Badge>)}
-            {renderIf(!!thread.pr, <Badge>PR {thread.pr}</Badge>)}
-            {renderIf(!!thread.worktree, <Badge tone={autonomy.tone}>worktree</Badge>)}
-            {renderIf(!!thread.note, <span className="faint">{thread.note}</span>)}
+            {renderIf(thread?.kind === ThreadKind.RECURRING, <Badge>recurring</Badge>)}
+            {renderIf(!!thread?.repo, <Badge>{thread?.repo}</Badge>)}
+            {renderIf(!!thread?.branch, <Badge>{thread?.branch}</Badge>)}
+            {renderIf(!!thread?.pr, <Badge>PR {thread?.pr}</Badge>)}
+            {renderIf(!!thread?.worktree, <Badge tone={autonomy.tone}>worktree</Badge>)}
+            {renderIf(!!thread?.note, <span className="faint">{thread?.note}</span>)}
             <span className="party-thread-actions">
-              {renderIf(!!thread.cwd, <button className="btn sm ghost" onClick={() => void window.hq.openPath(thread.cwd)}>Open folder</button>)}
- {renderIf(canCompact, <button className="btn sm ghost" title="Continue this chat in Claude Code in Terminal (same session)" onClick={() => void window.hq.openThreadInTerminal(creature.id, thread.id)}>Terminal</button>)}
-              {renderIf(canCompact, <button className="btn sm ghost" title="Summarize this chat in place (Claude Code /compact)" onClick={() => void window.hq.compactThread(creature.id, thread.id)}>Compact</button>)}
-              {renderIf(quests.length > 0, <button className="btn sm ghost" onClick={() => void window.hq.clearThread(creature.id, thread.id)}>Clear</button>)}
-              <button className="btn sm ghost" onClick={() => { void window.hq.archiveThread(thread.id, false); setThreadId(undefined); }}>Archive</button>
-              {renderIf(!!thread.worktree, <button className="btn sm ghost danger" onClick={() => { void window.hq.archiveThread(thread.id, true); setThreadId(undefined); }}>Archive + remove worktree</button>)}
+              {renderIf(!!thread?.cwd, <button className="btn sm ghost" onClick={() => void window.hq.openPath(thread?.cwd)}>Open folder</button>)}
+              {renderIf(canCompact, <button className="btn sm ghost" title="Continue this chat in Claude Code in Terminal (same session)" onClick={() => void window.hq.openThreadInTerminal(creature.id, thread?.id)}>Terminal</button>)}
+              {renderIf(canCompact, <button className="btn sm ghost" title="Summarize this chat in place (Claude Code /compact): keeps the context, costs less per step" onClick={() => void window.hq.compactThread(creature.id, thread?.id)}>Compact</button>)}
+              {renderIf(quests.length > 0, <button className="btn sm ghost" title="Start fresh. This conversation moves to History, where you can reopen it." onClick={() => void window.hq.clearThread(creature.id, thread?.id)}>Clear</button>)}
+              {renderIf(!!thread, <button className="btn sm ghost" title="Hide this thread. It stays in History." onClick={() => { if (thread) void window.hq.archiveThread(thread.id, false); setThreadId(undefined); }}>Archive</button>)}
+              {renderIf(!!thread?.worktree, <button className="btn sm ghost danger" onClick={() => { if (thread) void window.hq.archiveThread(thread.id, true); setThreadId(undefined); }}>Archive + remove worktree</button>)}
             </span>
           </div>
-        ) : null)}
+        ))}
+        {renderIf(historyOpen, <ChatHistory state={state} creatureId={creature.id} onOpen={openPast} onClose={closeHistory} />)}
       </div>
       <div className="party-log" ref={logRef} onScroll={onLogScroll}>
         {renderIf(quests.length === 0, <p className="party-hello muted">{creature.blurb || `${creature.name} is ready.`} What do you need?</p>)}

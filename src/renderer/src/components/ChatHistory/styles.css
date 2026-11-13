@@ -1,0 +1,13 @@
+.chist-backdrop { position: fixed; inset: 0; z-index: 20; }
+.chist { position: absolute; top: 44px; right: 22px; z-index: 21; width: min(440px, calc(100% - 44px)); display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow); transform-origin: top right; transition: transform 180ms var(--ease-out), opacity 150ms ease; }
+@starting-style { .chist { transform: scale(0.97); opacity: 0; } }
+.chist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 11px; }
+.chist-empty { font-size: 12px; }
+.chist-list { display: grid; max-height: 320px; overflow-y: auto; }
+.chist-row { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); }
+.chist-main { flex: 1; min-width: 0; display: grid; gap: 2px; padding: 8px 6px; border-radius: 8px; text-align: left; }
+@media (hover: hover) and (pointer: fine) { .chist-main:hover { background: var(--surface-2); } }
+.chist-title { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chist-meta { font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chist-error { color: var(--red); font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .chist { transition: none; } }

@@ -16,8 +16,12 @@
 .party-attach input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .party-composer { padding-left: 6px; }
 .party-drop { position: absolute; inset: 10px; z-index: 10; display: grid; place-items: center; border-radius: 18px; border: 2px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--fg); font-weight: 700; pointer-events: none; }
-.party-threads { display: grid; gap: 8px; padding: 10px 22px 0; border-bottom: 1px solid var(--line); }
-.party-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.party-threads { position: relative; display: grid; gap: 8px; padding: 10px 22px 0; border-bottom: 1px solid var(--line); }
+.party-tabs-row { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
+.party-tabs { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.party-history-btn { flex: none; margin-bottom: 3px; font-variant-numeric: tabular-nums; }
+.party-history-btn[aria-expanded='true'] { color: var(--fg); background: var(--surface-2); }
+.party-tab-kind { color: var(--accent); font-weight: 700; }
 .party-tabs::-webkit-scrollbar { display: none; }
 .party-tab { flex: none; display: flex; align-items: center; gap: 6px; max-width: 220px; height: 30px; padding: 0 12px; border-radius: 9px 9px 0 0; font-size: 12px; color: var(--fg-2); border: 1px solid transparent; border-bottom: 0; transition: background-color 150ms ease, color 150ms ease; }
 .party-tab[aria-selected='true'] { color: var(--fg); font-weight: 700; background: var(--surface-2); border-color: var(--line); }
@@ -25,8 +29,6 @@
 .party-tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .party-tab-live { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 20%, transparent); }
 .party-tab-add { color: var(--accent); font-weight: 700; }
-.party-clear-btn { margin-left: auto; align-self: center; margin-bottom: 4px; }
-.party-clear-btn + .party-clear-btn { margin-left: 4px; }
 .party-thread-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-bottom: 8px; font-size: 12px; }
 .party-thread-actions { margin-left: auto; display: flex; gap: 4px; }
 

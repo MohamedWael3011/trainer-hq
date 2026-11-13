@@ -2,12 +2,22 @@ import { execFileSync } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
+import { ThreadKind, type ThreadKindType } from '@shared/constants';
 import type { ThreadCreateRequestType, ThreadType } from '@shared/types';
 import { appHome, profileHome } from './paths';
 
 const THREADS_FILE = 'threads.json';
 const SAFE = /[^a-zA-Z0-9._-]+/g;
 const GIT_TIMEOUT_MS = 120_000;
+const TITLE_LIMIT = 48;
+
+type ThreadSeedType = Pick<ThreadType, 'creatureId' | 'title'> & Partial<Pick<ThreadType, 'repo' | 'cwd' | 'branch' | 'pr' | 'recap' | 'note' | 'archived'>> & { kind: ThreadKindType };
+
+export const threadTitle = (text: string, fallback: string): string => {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (!flat) return fallback;
+  return flat.length > TITLE_LIMIT ? `${flat.slice(0, TITLE_LIMIT)}…` : flat;
+};
 
 const git = (cwd: string, args: string[]): string =>
   execFileSync('git', args, { cwd, encoding: 'utf8', timeout: GIT_TIMEOUT_MS, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -121,6 +131,45 @@ export class ThreadStore {
     return thread;
   }
 
+  add(seed: ThreadSeedType): ThreadType {
+    const now = Date.now();
+    const thread: ThreadType = {
+      ...seed,
+      id: randomUUID().slice(0, 8),
+      createdAt: now,
+      updatedAt: now,
+      archived: !!seed.archived,
+      archivedAt: seed.archived ? now : undefined,
+    };
+    this.threads.push(thread);
+    this.save();
+    return thread;
+  }
+
+  restore(id: string): void {
+    const thread = this.get(id);
+    if (!thread) return;
+    thread.archived = false;
+    thread.archivedAt = undefined;
+    if (thread.kind === ThreadKind.CLEARED) thread.kind = ThreadKind.CHAT;
+    this.save();
+  }
+
+  remove(id: string, repoPath: string | undefined): void {
+    const thread = this.get(id);
+    if (!thread) return;
+    if (thread.worktree && existsSync(thread.worktree)) {
+      if (!repoPath) throw new Error('This thread still has a worktree, and its repo is no longer in profile.yaml. Remove the worktree first.');
+      try {
+        git(repoPath, ['worktree', 'remove', thread.worktree]);
+      } catch (error) {
+        throw new Error(`Not deleted, its worktree could not be removed: ${(error as Error).message.split('\n')[0]}`);
+      }
+    }
+    this.threads = this.threads.filter((entry) => entry.id !== id);
+    this.save();
+  }
+
   consumeRecap(id: string): void {
     const thread = this.get(id);
     if (!thread?.recap) return;
@@ -139,6 +188,7 @@ export class ThreadStore {
     const thread = this.get(id);
     if (!thread) return;
     thread.archived = true;
+    thread.archivedAt = Date.now();
     if (removeWorktree && thread.worktree && repoPath) {
       try {
         git(repoPath, ['worktree', 'remove', thread.worktree]);

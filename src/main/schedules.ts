@@ -90,6 +90,13 @@ export class ScheduleStore {
     return schedule.id;
   }
 
+  setThread(id: string, threadId: string): void {
+    const schedule = this.get(id);
+    if (!schedule) return;
+    schedule.threadId = threadId;
+    this.persist();
+  }
+
   remove(id: string): void {
     this.schedules = this.schedules.filter((schedule) => schedule.id !== id);
     this.persist();

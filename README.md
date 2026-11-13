@@ -220,7 +220,7 @@ Approvals are answered by a tiny MCP server (`resources/mcp/permission-server.cj
 <details>
 <summary><b>Threads</b></summary>
 
-Each creature has a **Main** thread and as many extra threads as you like (**+ Thread** above the chat). A thread is its own Claude session, like another terminal running `claude`. Point it at a repo branch or a PR (resolved with `gh`) and, with **isolated worktree** on, Trainer HQ runs `git worktree add` into `~/.trainer-hq/worktrees/` so your checkout is untouched. **Archive + remove worktree** cleans up.
+Each creature has a **Main** thread and as many extra threads as you like (**+ Thread** above the chat). A thread is its own Claude session, like another terminal running `claude`. Point it at a repo branch or a PR (resolved with `gh`) and, with **isolated worktree** on, Trainer HQ runs `git worktree add` into `~/.trainer-hq/worktrees/` so your checkout is untouched. **Archive + remove worktree** cleans up. **Clear** starts a chat fresh and moves the old conversation to **History** (top right of the thread bar), where archived threads also live: reopen one to continue it in the same session, or delete it for good. Recurring quests run in their own **↻** thread, not in Main.
 </details>
 
 <details>

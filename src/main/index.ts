@@ -66,6 +66,8 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.THREAD_CREATE, (_event, request: ThreadCreateRequestType) => hq.createThread(request));
   ipcMain.handle(Ipc.THREAD_ARCHIVE, (_event, id: string, removeWorktree: boolean) => hq.archiveThread(id, removeWorktree));
   ipcMain.handle(Ipc.THREAD_CLEAR, (_event, creatureId: string, threadId?: string) => hq.clearThread(creatureId, threadId));
+  ipcMain.handle(Ipc.THREAD_RESTORE, (_event, id: string) => hq.restoreThread(id));
+  ipcMain.handle(Ipc.THREAD_DELETE, (_event, id: string) => hq.deleteThread(id));
   ipcMain.handle(Ipc.THREAD_COMPACT, (_event, creatureId: string, threadId?: string) => hq.compactThread(creatureId, threadId));
   ipcMain.handle(Ipc.UPDATE_CHECK, () => hq.checkUpdate());
   ipcMain.handle(Ipc.UPDATE_INSTALL, () => hq.installUpdate());

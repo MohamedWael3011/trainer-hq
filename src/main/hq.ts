@@ -6,6 +6,7 @@ import {
   Autonomy,
   ScheduleCadence,
   type ScheduleCadenceType,
+  ThreadKind,
   ContextOption,
   MAX_HANDOFF_DEPTH,
   DaycareAction,
@@ -72,7 +73,7 @@ import { planClaudeRun, sessionContextFromLog, type RunContextType } from './gua
 import { buildHatchPrompt, hatcheryCreature } from './hatchery';
 import { resourcesDir } from './paths';
 import { QuestStore } from './quests';
-import { ThreadStore, threadKey } from './threads';
+import { ThreadStore, threadKey, threadTitle } from './threads';
 import { Lab } from './lab';
 import { readSettings, writeSettings } from './settings';
 import { checkPrerequisites } from './prereqs';
@@ -90,6 +91,8 @@ const DEFAULT_COLD_MINUTES = 60;
 const TOKENS_PER_K = 1000;
 const AGY_RESET_MIN_TOKENS = 40_000;
 const BASH_OUTPUT_CHARS = '16000';
+const MAIN_CHAT_TITLE = 'Main';
+const RECURRING_THREAD_TITLE = 'Recurring quest';
 const SCHEDULE_TIME = /^([01]?\d|2[0-3]):([0-5]\d)$/;
 
 export type NudgeType = {
@@ -410,7 +413,10 @@ export class Hq {
       });
     }
     if (thread?.recap && !stored && !recapContext) {
-      recapContext = `This thread continues a Claude Code terminal session that had grown too large to keep resending. The last exchanges were:\n\n${thread.recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`;
+      const origin = thread.kind === ThreadKind.RECURRING
+        ? 'This thread runs a recurring quest that was set up in another chat. The last exchanges there were'
+        : 'This thread continues a Claude Code terminal session that had grown too large to keep resending. The last exchanges were';
+      recapContext = `${origin}:\n\n${thread.recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`;
       this.threads.consumeRecap(thread.id);
     }
     const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, [threadContext, recapContext].filter(Boolean).join('\n\n'));
@@ -479,7 +485,7 @@ export class Hq {
         resumeSessionId: claudeSession,
         skipWorktree: !!thread?.worktree || !checkoutBusy,
         supports: claudeFlagSupport(engine.bin, this.env()),
-        sessionName: `${creature.name} · ${thread?.title ?? 'Main'}`,
+        sessionName: `${creature.name} · ${thread?.title ?? MAIN_CHAT_TITLE}`,
         context,
         floorTokens: this.quests.sessionFloor(creature.id),
         bridge: {
@@ -834,9 +840,33 @@ export class Hq {
 
   archiveThread(id: string, removeWorktree: boolean): void {
     const thread = this.threads.get(id);
-    if (thread) this.quests.clearSession(threadKey(thread.creatureId, id));
     this.threads.archive(id, removeWorktree, thread?.repo ? this.profile.repos[thread.repo] : undefined);
     this.emit();
+  }
+
+  restoreThread(id: string): void {
+    this.threads.restore(id);
+    this.emit();
+  }
+
+  deleteThread(id: string): void {
+    const thread = this.threads.get(id);
+    if (!thread) return;
+    this.threads.remove(id, thread.repo ? this.profile.repos[thread.repo] : undefined);
+    this.dropPending(threadKey(thread.creatureId, id));
+    this.quests.clearThread(thread.creatureId, id).forEach((questId) => {
+      this.running.get(questId)?.cancel();
+      this.running.delete(questId);
+      this.approvals.denyAllForQuest(questId);
+    });
+    this.emit();
+  }
+
+  private dropPending(sessionKey: string): void {
+    this.chatQueue.delete(sessionKey);
+    this.held.delete(sessionKey);
+    this.liveChats.delete(sessionKey);
+    this.scheduleHeld();
   }
 
   // Claude Code's own /compact: summarizes the chat in place so it keeps its context but costs less per step.
@@ -869,15 +899,27 @@ export class Hq {
   }
 
   clearThread(creatureId: string, threadId?: string): void {
-    this.chatQueue.delete(threadKey(creatureId, threadId));
-    this.held.delete(threadKey(creatureId, threadId));
-    this.scheduleHeld();
-    const removedIds = this.quests.clearThread(creatureId, threadId);
-    removedIds.forEach((questId) => {
-      this.running.get(questId)?.cancel();
-      this.running.delete(questId);
-      this.approvals.denyAllForQuest(questId);
-    });
+    this.dropPending(threadKey(creatureId, threadId));
+    const source = this.threads.get(threadId);
+    const first = [...this.quests.list()]
+      .reverse()
+      .find((quest) => quest.creatureId === creatureId && (quest.kind === QuestKind.CHAT || quest.kind === QuestKind.HANDOFF) && quest.threadId === threadId);
+    if (first) {
+      const stash = this.threads.add({
+        creatureId,
+        title: threadTitle(first.title, source?.title ?? MAIN_CHAT_TITLE),
+        kind: ThreadKind.CLEARED,
+        archived: true,
+        repo: source?.repo,
+        cwd: source?.cwd,
+        branch: source?.branch,
+        pr: source?.pr,
+      });
+      this.quests.moveChat(creatureId, threadId, stash.id).forEach((questId) => {
+        this.running.get(questId)?.cancel();
+        this.approvals.denyAllForQuest(questId);
+      });
+    }
     this.emit();
   }
 
@@ -1027,9 +1069,19 @@ export class Hq {
     if (!request.cadence || !cadences.includes(request.cadence)) throw new Error(`cadence must be one of ${cadences.join(', ')}.`);
     const time = String(request.time ?? '').match(SCHEDULE_TIME);
     if (!time) throw new Error('time must be HH:MM in 24-hour local time, for example 00:00.');
+    if (!String(request.prompt ?? '').trim()) throw new Error('prompt is required: write what should run each time.');
+    const home = this.threads.get(quest.threadId);
+    const ownThread = home && !home.archived
+      ? undefined
+      : this.threads.add({
+          creatureId: quest.creatureId,
+          title: threadTitle(String(request.prompt ?? ''), RECURRING_THREAD_TITLE),
+          kind: ThreadKind.RECURRING,
+          recap: quest.sessionId ? this.quests.recap(quest.sessionId) || undefined : undefined,
+        });
     const id = this.schedules.save({
       creatureId: quest.creatureId,
-      threadId: quest.threadId,
+      threadId: ownThread?.id ?? home?.id,
       prompt: String(request.prompt ?? ''),
       cadence: request.cadence as ScheduleCadenceType,
       hour: Number(time[1]),
@@ -1040,7 +1092,7 @@ export class Hq {
     const next = this.schedules.get(id)?.nextRunAt ?? Date.now();
     this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: `Recurring quest created (${request.cadence}, ${time[0]}). Pause or delete it in the Quests tab.` });
     this.emit();
-    return `Scheduled. First run: ${new Date(next).toLocaleString()}. It runs in this chat while Trainer HQ is open; the user can pause or delete it in the Quests tab.`;
+    return `Scheduled. First run: ${new Date(next).toLocaleString()}. It runs ${ownThread ? `in its own thread, "${ownThread.title}", not in this chat,` : 'in this thread'} while Trainer HQ is open; the user can pause or delete it in the Quests tab.`;
   }
 
   private runDueSchedules(): void {
@@ -1050,10 +1102,25 @@ export class Hq {
     });
   }
 
+  private scheduleThread(schedule: ScheduleType): ThreadType {
+    const existing = this.threads.get(schedule.threadId);
+    if (existing && !existing.archived) return existing;
+    if (existing?.kind === ThreadKind.RECURRING) {
+      this.threads.restore(existing.id);
+      return existing;
+    }
+    const thread = this.threads.add({
+      creatureId: schedule.creatureId,
+      title: threadTitle(schedule.prompt, RECURRING_THREAD_TITLE),
+      kind: ThreadKind.RECURRING,
+    });
+    this.schedules.setThread(schedule.id, thread.id);
+    return thread;
+  }
+
   private fireSchedule(schedule: ScheduleType): void {
     try {
-      const thread = this.threads.get(schedule.threadId);
-      const questId = this.chat({ creatureId: schedule.creatureId, text: schedule.prompt, threadId: thread && !thread.archived ? thread.id : undefined });
+      const questId = this.chat({ creatureId: schedule.creatureId, text: schedule.prompt, threadId: this.scheduleThread(schedule).id });
       this.quests.addEvent(questId, { kind: EventKind.SYSTEM, text: 'Recurring quest: started on its schedule.' });
     } catch (error) {
       this.errors = [...this.errors, `Recurring quest skipped: ${(error as Error).message}`];

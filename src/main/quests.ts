@@ -194,6 +194,22 @@ export class QuestStore {
     this.persist();
   }
 
+  moveChat(creatureId: string, fromThreadId: string | undefined, toThreadId: string): string[] {
+    const moved = this.quests.filter(
+      (quest) => quest.creatureId === creatureId && (quest.kind === QuestKind.CHAT || quest.kind === QuestKind.HANDOFF) && quest.threadId === fromThreadId,
+    );
+    moved.forEach((quest) => {
+      quest.threadId = toThreadId;
+    });
+    const fromKey = fromThreadId ? `${creatureId}:${fromThreadId}` : creatureId;
+    const session = this.sessions[fromKey];
+    delete this.sessions[fromKey];
+    if (session) this.sessions[`${creatureId}:${toThreadId}`] = session;
+    this.persist();
+    this.onChange();
+    return moved.map((quest) => quest.id);
+  }
+
   clearThread(creatureId: string, threadId?: string): string[] {
     delete this.sessions[threadId ? `${creatureId}:${threadId}` : creatureId];
     const targetIds = new Set(

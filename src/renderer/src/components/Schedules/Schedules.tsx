@@ -94,7 +94,7 @@ const Schedules = ({ state }: PropsType) => {
             <input aria-label="Time" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
             <button className="btn sm primary" type="submit" disabled={!prompt.trim() || !chosen}>Save</button>
           </div>
-          <p className="faint sched-note">Runs while Trainer HQ is open. One missed while it was closed runs once at the next launch.{cadence === ScheduleCadence.HOURLY ? ' Hourly uses only the minutes of the time.' : ''}</p>
+          <p className="faint sched-note">Each recurring quest runs in its own ↻ thread in the creature's chat, not in Main. Runs while Trainer HQ is open. One missed while it was closed runs once at the next launch.{cadence === ScheduleCadence.HOURLY ? ' Hourly uses only the minutes of the time.' : ''}</p>
           {renderIf(!!error, <p className="sched-error selectable">{error}</p>)}
         </form>
       ))}

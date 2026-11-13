@@ -4,6 +4,7 @@ import type {
   ContextOptionType,
   NoteFlagType,
   ScheduleCadenceType,
+  ThreadKindType,
   EngineAdapterType,
   LabJobKindType,
   LabJobStatusType,
@@ -126,9 +127,11 @@ export type ThreadType = {
   note?: string;
   recap?: string;
   adoptedFrom?: string;
+  kind?: ThreadKindType;
   createdAt: number;
   updatedAt: number;
   archived: boolean;
+  archivedAt?: number;
 };
 
 export type ThreadCreateRequestType = {

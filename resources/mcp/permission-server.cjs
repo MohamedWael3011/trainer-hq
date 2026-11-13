@@ -75,7 +75,7 @@ const tools = [
   },
   {
     name: SCHEDULE_TOOL,
-    description: 'Create a recurring quest in Trainer HQ: the app sends you the prompt on a schedule, in this same chat, and the user can pause or delete it in the Quests tab. Use this for anything that should repeat (a daily refresh, a weekly report). Session crons, loops and background sleeps stop when your reply ends, so they never fire.',
+    description: 'Create a recurring quest in Trainer HQ: the app sends you the prompt on a schedule, in a thread of its own (or in this thread, when you are already in one), and the user can pause or delete it in the Quests tab. Write the prompt so it stands on its own, naming the files, links and artifacts it needs. Use this for anything that should repeat (a daily refresh, a weekly report). Session crons, loops and background sleeps stop when your reply ends, so they never fire.',
     inputSchema: {
       type: 'object',
       properties: {

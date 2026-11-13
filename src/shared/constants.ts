@@ -166,6 +166,8 @@ export const Ipc = {
   THREAD_CREATE: 'thread:create',
   THREAD_ARCHIVE: 'thread:archive',
   THREAD_CLEAR: 'thread:clear',
+  THREAD_RESTORE: 'thread:restore',
+  THREAD_DELETE: 'thread:delete',
   THREAD_COMPACT: 'thread:compact',
   THREAD_TERMINAL: 'thread:terminal',
   THREAD_HELD_SEND: 'thread:held-send',
@@ -243,6 +245,13 @@ export const CONTEXT_OPTIONS: { id: ContextOptionType; label: string; desc: stri
   { id: ContextOption.SLASH_COMMANDS, label: 'Skills and commands', desc: 'List every installed skill and slash command.', saves: 'Off saves about 5k tokens per session' },
   { id: ContextOption.CONNECTORS, label: 'Connectors', desc: 'claude.ai connectors and your own MCP servers.', saves: 'Off saves about 4k tokens per session' },
 ];
+
+export const ThreadKind = {
+  CHAT: 'chat',
+  RECURRING: 'recurring',
+  CLEARED: 'cleared',
+} as const;
+export type ThreadKindType = (typeof ThreadKind)[keyof typeof ThreadKind];
 
 export const ScheduleCadence = {
   HOURLY: 'hourly',
