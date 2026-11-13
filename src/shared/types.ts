@@ -1,5 +1,9 @@
 import type {
   AttachmentKindType,
+  CommandKindType,
+  ContextOptionType,
+  NoteFlagType,
+  ScheduleCadenceType,
   EngineAdapterType,
   LabJobKindType,
   LabJobStatusType,
@@ -41,6 +45,10 @@ export type CreatureType = {
   learnsInto: string;
   learnsReview: boolean;
   dir: string;
+  artifacts: boolean;
+  slashCommands: boolean;
+  connectors: boolean;
+  weeklyBudgetUsd?: number;
 };
 
 export type QuestEventType = {
@@ -58,6 +66,8 @@ export type QuestUsageType = {
   model?: string;
   // Size of the conversation on the last API call: what the next message has to resend.
   contextTokens?: number;
+  baseTokens?: number;
+  compactions?: number;
 };
 
 // A newer build is on GitHub than the one running.
@@ -114,6 +124,8 @@ export type ThreadType = {
   pr?: string;
   worktree?: string;
   note?: string;
+  recap?: string;
+  adoptedFrom?: string;
   createdAt: number;
   updatedAt: number;
   archived: boolean;
@@ -218,13 +230,17 @@ export type AppStateType = {
   held: HeldChatType[];
   queued: QueuedChatType[];
   errors: string[];
+  usageReport: UsageReportType;
+  terminalSessions: TerminalSessionType[];
+  schedules: ScheduleType[];
 };
 
 // A slash command or skill a creature can run, for the composer's suggestions and the chat log.
 export type CommandInfoType = {
   name: string;
   description: string;
-  kind: 'skill' | 'command' | 'builtin';
+  kind: CommandKindType;
+  prompt?: string;
 };
 
 // Messages sent while a creature works that wait for its reply to finish.
@@ -377,4 +393,93 @@ export type ApprovalDecisionType = {
 export type DaycareDecisionType = {
   id: string;
   action: DaycareActionType;
+};
+
+export type CreatureUsageType = {
+  creatureId: string;
+  quests: number;
+  handoffs: number;
+  freshTokens: number;
+  cacheReadTokens: number;
+  costUsd: number;
+  compactions: number;
+  freshSessions: number;
+  coldResets: number;
+  weekCostUsd: number;
+  weeklyBudgetUsd?: number;
+};
+
+export type UsageDayType = {
+  day: string;
+  costUsd: number;
+  tokens: number;
+};
+
+export type UsageReportType = {
+  days: number;
+  creatures: CreatureUsageType[];
+  byDay: UsageDayType[];
+};
+
+export type TerminalSessionType = {
+  sessionId: string;
+  cwd: string;
+  project: string;
+  title: string;
+  contextTokens: number;
+  lastActiveAt: number;
+  large: boolean;
+  cold: boolean;
+};
+
+export type SessionAdoptRequestType = {
+  sessionId: string;
+  creatureId: string;
+};
+
+export type ScheduleType = {
+  id: string;
+  creatureId: string;
+  threadId?: string;
+  prompt: string;
+  cadence: ScheduleCadenceType;
+  hour: number;
+  minute: number;
+  weekday: number;
+  enabled: boolean;
+  lastRunAt?: number;
+  nextRunAt: number;
+};
+
+export type ScheduleSaveRequestType = {
+  id?: string;
+  creatureId: string;
+  threadId?: string;
+  prompt: string;
+  cadence: ScheduleCadenceType;
+  hour: number;
+  minute: number;
+  weekday: number;
+  enabled: boolean;
+};
+
+export type BrainNoteHealthType = {
+  path: string;
+  label: string;
+  bytes: number;
+  updatedAt: number;
+  reads: number;
+  lastReadAt?: number;
+  flags: NoteFlagType[];
+};
+
+export type BrainHealthType = {
+  trackedSince: number;
+  notes: BrainNoteHealthType[];
+};
+
+export type CreatureContextRequestType = {
+  creatureId: string;
+  option: ContextOptionType;
+  enabled: boolean;
 };

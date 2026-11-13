@@ -14,6 +14,7 @@ export const PermissionMode = {
 // Claude models offered in the Dex. An empty id means the CLI's default model.
 export const CLAUDE_MODELS = [
   { id: '', label: 'Default', desc: 'Follows your CLI setting (Opus)', cost: 'CLI default (Opus)', optionLabel: 'Default · follows CLI (Opus)' },
+  { id: 'auto', label: 'Auto', desc: 'Sonnet for short lookups · your default for real work', cost: 'Saves plan use', optionLabel: 'Auto · Sonnet for short lookups' },
   { id: 'claude-fable-5-1', label: 'Fable 5.1', desc: 'Most capable · uses your plan fastest', cost: 'Highest plan use', optionLabel: 'Fable 5.1 · most capable, uses your plan fastest' },
   { id: 'opus', label: 'Opus', desc: 'Deep reasoning · heavy plan use', cost: 'High plan use', optionLabel: 'Opus · deep reasoning, heavy plan use' },
   { id: 'sonnet', label: 'Sonnet', desc: 'Balanced speed and smarts', cost: 'Medium plan use', optionLabel: 'Sonnet · balanced' },
@@ -209,8 +210,69 @@ export const Ipc = {
   ATTACHMENT_INSPECT: 'attachment:inspect',
   ATTACHMENT_SAVE_PASTE: 'attachment:save-paste',
   SKILL_INSTALL: 'skill:install',
+  CREATURE_CONTEXT: 'creature:context',
+  CREATURE_BUDGET: 'creature:budget',
+  BRAIN_HEALTH: 'brain:health',
+  SCHEDULE_SAVE: 'schedule:save',
+  SCHEDULE_DELETE: 'schedule:delete',
+  SCHEDULE_RUN: 'schedule:run',
+  SESSION_ADOPT: 'session:adopt',
   LOGIN_ITEM_SET: 'app:login-item-set',
 } as const;
+
+export const AUTO_MODEL = 'auto';
+export const LIGHT_MODEL = 'sonnet';
+
+export const CommandKind = {
+  SKILL: 'skill',
+  COMMAND: 'command',
+  BUILTIN: 'builtin',
+  TEMPLATE: 'template',
+} as const;
+export type CommandKindType = (typeof CommandKind)[keyof typeof CommandKind];
+
+export const ContextOption = {
+  ARTIFACTS: 'artifacts',
+  SLASH_COMMANDS: 'slashCommands',
+  CONNECTORS: 'connectors',
+} as const;
+export type ContextOptionType = (typeof ContextOption)[keyof typeof ContextOption];
+
+export const CONTEXT_OPTIONS: { id: ContextOptionType; label: string; desc: string; saves: string }[] = [
+  { id: ContextOption.ARTIFACTS, label: 'Artifacts', desc: 'Publish claude.ai Artifacts from this chat.', saves: 'Off saves about 13k tokens per session' },
+  { id: ContextOption.SLASH_COMMANDS, label: 'Skills and commands', desc: 'List every installed skill and slash command.', saves: 'Off saves about 5k tokens per session' },
+  { id: ContextOption.CONNECTORS, label: 'Connectors', desc: 'claude.ai connectors and your own MCP servers.', saves: 'Off saves about 4k tokens per session' },
+];
+
+export const ScheduleCadence = {
+  HOURLY: 'hourly',
+  DAILY: 'daily',
+  WEEKDAYS: 'weekdays',
+  WEEKLY: 'weekly',
+} as const;
+export type ScheduleCadenceType = (typeof ScheduleCadence)[keyof typeof ScheduleCadence];
+
+export const SCHEDULE_CADENCES: { id: ScheduleCadenceType; label: string }[] = [
+  { id: ScheduleCadence.HOURLY, label: 'Every hour' },
+  { id: ScheduleCadence.DAILY, label: 'Every day' },
+  { id: ScheduleCadence.WEEKDAYS, label: 'Weekdays' },
+  { id: ScheduleCadence.WEEKLY, label: 'Every week' },
+];
+
+export const NoteFlag = {
+  INLINE: 'inline',
+  NEVER_READ: 'never-read',
+  STALE: 'stale',
+  LARGE: 'large',
+} as const;
+export type NoteFlagType = (typeof NoteFlag)[keyof typeof NoteFlag];
+
+export const NOTE_FLAG_LABEL: Record<NoteFlagType, string> = {
+  [NoteFlag.INLINE]: 'Always loaded',
+  [NoteFlag.NEVER_READ]: 'Never read',
+  [NoteFlag.STALE]: 'Stale',
+  [NoteFlag.LARGE]: 'Large',
+};
 
 export const SPRITE_PROTOCOL = 'thq-sprite';
 export const SPRITE_HOST = 'creature';

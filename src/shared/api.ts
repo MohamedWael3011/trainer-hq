@@ -20,6 +20,10 @@ import type {
   DaycareDecisionType,
   HatchRequestType,
   NotchMetricsType,
+  BrainHealthType,
+  CreatureContextRequestType,
+  ScheduleSaveRequestType,
+  SessionAdoptRequestType,
 } from './types';
 
 export type HqApiType = {
@@ -92,4 +96,11 @@ export type HqApiType = {
   getOpenAtLogin: () => Promise<boolean>;
   getNotchMetrics: () => Promise<NotchMetricsType>;
   setOpenAtLogin: (enabled: boolean) => Promise<void>;
+  setCreatureContext: (request: CreatureContextRequestType) => Promise<void>;
+  setCreatureBudget: (creatureId: string, weeklyUsd: number) => Promise<void>;
+  brainHealth: (creatureId: string) => Promise<BrainHealthType>;
+  saveSchedule: (request: ScheduleSaveRequestType) => Promise<string>;
+  deleteSchedule: (id: string) => Promise<void>;
+  runSchedule: (id: string) => Promise<void>;
+  adoptSession: (request: SessionAdoptRequestType) => Promise<string>;
 };

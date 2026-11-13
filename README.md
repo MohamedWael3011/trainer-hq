@@ -64,9 +64,16 @@ A short onboarding checks your tools, sets up your vault and repos, and introduc
 | **Multiple displays** | The notch and dock follow the main display (the one with the menu bar) when monitors come and go, or stay on a screen you pick in **Settings → App**. Each hides only while its own screen shows a full-screen app, whether a macOS full-screen Space or an app with its own full-screen mode. |
 | **Slash commands & skills** | Type `/` in a chat to see the commands and skills that creature can run, with what each one does. A command you send shows its description, and a skill a creature runs shows as its own card. |
 | **Files a creature makes** | Renders, screenshots, HTML pages and PDFs a creature creates during a reply (named in its tool output or written by it, such as a render harness's `shots-*` folder) show as a card under the reply: thumbnails, where they were saved, **Open folder**, and a full-size preview. Background commands show as their own card. |
-| **Artifacts** | Claude creatures can publish claude.ai Artifacts (`Artifact`, `ArtifactData`, `ArtifactComments`), which headless Claude Code leaves out by default. Set `CLAUDE_CODE_ARTIFACT: "0"` under `env:` in `profile.yaml` to turn this off. |
+| **Artifacts** | Claude creatures can publish claude.ai Artifacts (`Artifact`, `ArtifactData`, `ArtifactComments`), which headless Claude Code leaves out by default. They load for creatures that list `Artifact` under `tools.allow` or have Artifacts switched on in the Dex, since the tools cost about 13k tokens per session. |
 | **Engines, models & cost** | Claude Code and Antigravity (`agy`) with model & effort pickers, plan-use labels, and per-reply token/cache/cost badges under every quest; any other CLI agent plugs in through a generic adapter. |
 | **Attachments** | Drop or paste files: their paths go into the message, zips are unpacked, and skill zips install in one click. |
+| **Usage and budgets** | The Trainer tab shows tokens, cache share, cost, compactions and cold restarts per creature for the last 30 days. Give a creature a weekly budget in the Dex and new quests pause once it is spent. |
+| **Lean sessions** | Each creature loads only what it uses: Artifacts, the skills listing and connectors are switches in the Dex (about 13k, 5k and 4k tokens per session). A chat that keeps auto-compacting without freeing much is stopped instead of paying to summarize in a loop. |
+| **Auto model** | Pick **Auto** as a creature's model and short lookups run on Sonnet while real work stays on your default. Creatures answering a teammate always use the light model. |
+| **Terminal session watch** | Your own Claude Code terminal sessions show up in the Trainer tab once they get large. A notification tells you when one passes 300k tokens or goes cold, and **Adopt** turns it into a creature thread that starts fresh with a short recap. |
+| **Recurring quests** | Ask a creature the same thing every hour, day, weekday or week from the Quests tab. |
+| **Quest templates** | Markdown files in your vault's `templates/` folder show up when you type `/` in a chat and fill the composer with their prompt. |
+| **Brain hygiene** | The Dex lists every brain note with its size, how often the creature has read it and when, and flags notes that are large, stale or never read. |
 | **Profiles** | One vault per profile (work, personal…), each optionally with its own Claude account. |
 | **Lab** *(optional)* | Plug in a render-harness skill to screenshot your app's real screens and hand them to a design-audit creature. |
 
@@ -296,6 +303,12 @@ session:                              # see "Keeping token use low"
   idleResetMinutes: 60                # 0 = always resume, however long the chat sat idle
   idleResetMinTokens: 40000
   fallbackModel: sonnet               # retry on this when Opus/Fable is overloaded ('' = off)
+  lightModel: sonnet                  # teammate answers and Auto-model lookups run on this ('' = off)
+
+watch:                                # your own Claude Code terminal sessions
+  terminalSessions: true
+  largeTokens: 300000                 # flag and notify past this size
+  notify: true
 
 daycare:
   mode: free                          # free: creatures list notes themselves · ai: extra Haiku pass · off
@@ -328,7 +341,7 @@ blurb: Finds where things live and explains how they work, with file paths.
 types: [EXPLORE, READ-ONLY]
 sprite: builtin:pigabyte            # or a path relative to the creature folder
 engine: claude                      # any key under engines:
-model: claude-sonnet-5-5            # optional
+model: claude-sonnet-5-5            # optional; auto = Sonnet for short lookups, your default otherwise
 effort: medium                      # optional: low | medium | high | xhigh | max (Claude only)
 autonomy: ask                       # ask | auto-edit | full-auto
 cwd: ~/code/my-app
@@ -342,6 +355,11 @@ tools:                              # Claude Code permission rule syntax
 learns:
   into: brain/
   review: true
+artifacts: false                    # optional: load the Artifact tools (default: on only if tools.allow lists Artifact)
+slashCommands: true                 # optional: list installed skills and commands (default: on)
+connectors: true                    # optional: claude.ai connectors and your MCP servers (default: on)
+budget:
+  weeklyUsd: 20                     # optional: pause new quests past this spend in 7 days (API rates)
 ```
 
 Built-in sprites: `pigabyte`, `flacono`, `anoleaf`, `grintrock`, `tweesher`, `cairfrey`, `eyenemy`, `hampotamos`, `sampsage`, `hatchling`.

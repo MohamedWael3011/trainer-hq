@@ -30,6 +30,13 @@ lines.on('close', () => { closed = true; });
 
 const turn = async () => {
   out({ type: 'system', subtype: 'init', session_id: 'sess-1' });
+  if (process.env.FAKE_COMPACT_LOOP) {
+    for (let pass = 0; pass < 3; pass += 1) {
+      out({ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger: 'auto', pre_tokens: 87000, post_tokens: 54000 } });
+    }
+    await wait(5000);
+    return;
+  }
   out({ type: 'stream_event', event: { type: 'message_start', message: { usage: {} } } });
   out({ type: 'stream_event', event: { type: 'content_block_start', content_block: { type: 'tool_use', name: 'Bash' } } });
   out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo hi' } }], usage: { input_tokens: 10, cache_read_input_tokens: 1000, cache_creation_input_tokens: 0 } } });

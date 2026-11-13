@@ -28,6 +28,10 @@ const ContentType = {
 
 const SubtypeInit = 'init';
 const SubtypeCompact = 'compact_boundary';
+const MANUAL_COMPACT = 'manual';
+const COMPACT_LOOP_LIMIT = 3;
+const COMPACT_LOW_YIELD = 0.5;
+const COMPACT_LOOP_ERROR = `Stopped: the chat auto-compacted ${COMPACT_LOOP_LIMIT} times in a row and each pass freed less than half of it, so it was paying to summarize over and over. Clear the chat to start small, or raise autocompact under session: in profile.yaml.`;
 
 const formatK = (tokens: number): string => (tokens >= 1000 ? `${Math.round(tokens / 1000)}k` : String(tokens));
 
@@ -78,6 +82,10 @@ export const runClaude = (options: {
   let timedOut = false;
   let questUsage: QuestUsageType | undefined;
   let contextTokens = 0;
+  let baseTokens = 0;
+  let compactions = 0;
+  let lowYieldCompactions = 0;
+  let compactLoop = false;
   let inputOpen = true;
   const totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, costUsd: 0, hasCost: false };
   const closeInput = (): void => {
@@ -183,16 +191,28 @@ export const runClaude = (options: {
       const meta = (message.compact_metadata ?? {}) as Record<string, unknown>;
       const before = Number(meta.pre_tokens ?? 0);
       const after = Number(meta.post_tokens ?? 0);
-      const how = meta.trigger === 'manual' ? 'Compacted' : 'Auto-compacted';
+      const manual = meta.trigger === MANUAL_COMPACT;
+      const how = manual ? 'Compacted' : 'Auto-compacted';
+      if (!manual) {
+        compactions += 1;
+        lowYieldCompactions = before > 0 && after >= before * COMPACT_LOW_YIELD ? lowYieldCompactions + 1 : 0;
+      }
       callbacks.onEvent({ kind: EventKind.SYSTEM, text: before > 0 && after > 0 ? `${how} the conversation: ${formatK(before)} → ${formatK(after)} tokens.` : `${how} the conversation.` });
       if (after > 0) contextTokens = after;
+      if (lowYieldCompactions >= COMPACT_LOOP_LIMIT && !compactLoop) {
+        compactLoop = true;
+        closeInput();
+        child.kill('SIGTERM');
+      }
       return;
     }
     if (message.type === StreamType.ASSISTANT && fromHelper) {
       // A helper agent's steps: show its tool calls as indented progress, keep its text out of the reply.
       const content = (message.message?.content ?? []) as Record<string, any>[];
       content.forEach((part) => {
-        if (part.type === ContentType.TOOL_USE) callbacks.onEvent({ kind: EventKind.TOOL, text: `↳ ${summarizeToolInput(part.name, part.input)}` });
+        if (part.type !== ContentType.TOOL_USE) return;
+        callbacks.onEvent({ kind: EventKind.TOOL, text: `↳ ${summarizeToolInput(part.name, part.input)}` });
+        callbacks.onToolUse?.(String(part.name ?? ''), (part.input ?? {}) as Record<string, unknown>);
       });
       return;
     }
@@ -203,11 +223,14 @@ export const runClaude = (options: {
       if (callUsage) {
         const size = Number(callUsage.input_tokens ?? 0) + Number(callUsage.cache_read_input_tokens ?? 0) + Number(callUsage.cache_creation_input_tokens ?? 0);
         if (size > 0) contextTokens = size;
+        if (size > 0 && baseTokens === 0) baseTokens = size;
       }
       const content = (message.message?.content ?? []) as Record<string, any>[];
       content.forEach((part) => {
         if (part.type === ContentType.TEXT && part.text?.trim()) callbacks.onEvent({ kind: EventKind.TEXT, text: part.text });
-        if (part.type === ContentType.TOOL_USE) callbacks.onEvent({ kind: EventKind.TOOL, text: summarizeToolInput(part.name, part.input) });
+        if (part.type !== ContentType.TOOL_USE) return;
+        callbacks.onEvent({ kind: EventKind.TOOL, text: summarizeToolInput(part.name, part.input) });
+        callbacks.onToolUse?.(String(part.name ?? ''), (part.input ?? {}) as Record<string, unknown>);
       });
       return;
     }
@@ -262,6 +285,8 @@ export const runClaude = (options: {
           costUsd: totals.hasCost ? totals.costUsd : undefined,
           model: modelKey,
           contextTokens: contextTokens || undefined,
+          baseTokens: baseTokens || undefined,
+          compactions: compactions || undefined,
         };
         callbacks.onQuestUsage?.(questUsage);
       }
@@ -271,15 +296,16 @@ export const runClaude = (options: {
   const done = new Promise<RunOutcomeType>((resolve) => {
     const finish = (code: number | null, spawnError?: Error) => {
       if (timer) clearTimeout(timer);
-      const errorText = spawnError?.message ?? (resultError ? resultText : code === 0 ? undefined : stderr.trim() || `claude exited with code ${code}`);
+      const errorText = compactLoop ? COMPACT_LOOP_ERROR : spawnError?.message ?? (resultError ? resultText : code === 0 ? undefined : stderr.trim() || `claude exited with code ${code}`);
       resolve({
-        ok: !spawnError && code === 0 && !resultError && !cancelled && !timedOut,
+        ok: !spawnError && code === 0 && !resultError && !cancelled && !timedOut && !compactLoop,
         resultText,
         error: errorText,
         usageLimited: USAGE_LIMIT_PATTERN.test(`${resultText}\n${stderr}`) && (resultError || code !== 0),
         cancelled,
         timedOut,
         usage: questUsage,
+        compactLoop,
       });
     };
     child.on('error', (error) => finish(null, error));

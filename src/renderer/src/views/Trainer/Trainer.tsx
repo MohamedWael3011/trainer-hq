@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import type { AppStateType } from '@shared/types';
 import Spark from '../../components/Spark/Spark';
 import Sprite from '../../components/Sprite/Sprite';
+import UsageTable from '../../components/UsageTable/UsageTable';
+import TerminalSessions from '../../components/TerminalSessions/TerminalSessions';
 import { renderIf } from '../../lib/renderIf';
 import { percent } from '../../lib/format';
 import './styles.css';
 
 type PropsType = {
   state: AppStateType;
+  onOpen: (creatureId: string) => void;
 };
 
-const Trainer = ({ state }: PropsType) => {
+const Trainer = ({ state, onOpen }: PropsType) => {
   const lead = state.creatures[0]?.id ?? 'egg';
   const [openAtLogin, setOpenAtLogin] = useState(false);
   useEffect(() => {
@@ -68,6 +71,8 @@ const Trainer = ({ state }: PropsType) => {
         </div>
         <div className="panel trainer-wide"><div className="eyebrow">Quests · last 14 days</div><Spark values={state.stats.sessionsByDay} /></div>
       </div>
+      <div className="trainer-full"><UsageTable state={state} /></div>
+      <div className="trainer-full"><TerminalSessions state={state} onOpen={onOpen} /></div>
     </section>
   );
 };

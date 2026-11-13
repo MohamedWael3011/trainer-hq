@@ -22,6 +22,10 @@ import type {
   DaycareDecisionType,
   HatchRequestType,
   NotchMetricsType,
+  BrainHealthType,
+  CreatureContextRequestType,
+  ScheduleSaveRequestType,
+  SessionAdoptRequestType,
 } from '@shared/types';
 
 const subscribe = <T>(channel: string, callback: (payload: T) => void): (() => void) => {
@@ -100,6 +104,13 @@ const api: HqApiType = {
   getOpenAtLogin: (): Promise<boolean> => ipcRenderer.invoke(Ipc.LOGIN_ITEM_GET),
   getNotchMetrics: (): Promise<NotchMetricsType> => ipcRenderer.invoke(Ipc.NOTCH_METRICS),
   setOpenAtLogin: (enabled: boolean): Promise<void> => ipcRenderer.invoke(Ipc.LOGIN_ITEM_SET, enabled),
+  setCreatureContext: (request: CreatureContextRequestType): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_CONTEXT, request),
+  setCreatureBudget: (creatureId: string, weeklyUsd: number): Promise<void> => ipcRenderer.invoke(Ipc.CREATURE_BUDGET, creatureId, weeklyUsd),
+  brainHealth: (creatureId: string): Promise<BrainHealthType> => ipcRenderer.invoke(Ipc.BRAIN_HEALTH, creatureId),
+  saveSchedule: (request: ScheduleSaveRequestType): Promise<string> => ipcRenderer.invoke(Ipc.SCHEDULE_SAVE, request),
+  deleteSchedule: (id: string): Promise<void> => ipcRenderer.invoke(Ipc.SCHEDULE_DELETE, id),
+  runSchedule: (id: string): Promise<void> => ipcRenderer.invoke(Ipc.SCHEDULE_RUN, id),
+  adoptSession: (request: SessionAdoptRequestType): Promise<string> => ipcRenderer.invoke(Ipc.SESSION_ADOPT, request),
 };
 
 contextBridge.exposeInMainWorld('hq', api);

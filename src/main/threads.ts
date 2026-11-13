@@ -103,6 +103,31 @@ export class ThreadStore {
     return thread;
   }
 
+  adopt(creatureId: string, title: string, cwd: string | undefined, recap: string, sessionId: string): ThreadType {
+    const thread: ThreadType = {
+      id: randomUUID().slice(0, 8),
+      creatureId,
+      title: title.trim() || 'Adopted session',
+      cwd,
+      recap: recap || undefined,
+      adoptedFrom: sessionId,
+      note: 'Adopted from a terminal session: starts fresh with a short recap.',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      archived: false,
+    };
+    this.threads.push(thread);
+    this.save();
+    return thread;
+  }
+
+  consumeRecap(id: string): void {
+    const thread = this.get(id);
+    if (!thread?.recap) return;
+    thread.recap = undefined;
+    this.save();
+  }
+
   touch(id: string): void {
     const thread = this.get(id);
     if (!thread) return;

@@ -1,0 +1,7 @@
+.bhealth-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; font-size: 12px; }
+.bhealth-list { display: grid; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 2px 14px; }
+.bhealth-row { display: grid; grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1.6fr); gap: 12px; align-items: center; padding: 8px 0; text-align: left; font-size: 12px; border-bottom: 1px solid var(--line); }
+.bhealth-row:last-child { border-bottom: 0; }
+.bhealth-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bhealth-flags { display: flex; gap: 4px; }
+.bhealth-meta { color: var(--fg-3); text-align: right; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

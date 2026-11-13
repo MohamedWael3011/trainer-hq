@@ -3,6 +3,9 @@ import { Autonomy, CLAUDE_MODELS, EngineAdapter, type AutonomyType } from '@shar
 import type { AppStateType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
+import BrainHealth from '../../components/BrainHealth/BrainHealth';
+import ContextOptions from '../../components/ContextOptions/ContextOptions';
+import WeeklyBudget from '../../components/WeeklyBudget/WeeklyBudget';
 import { renderIf } from '../../lib/renderIf';
 import { creatureById } from '../../lib/format';
 import { autonomyText, defaultVariant, useModelChoices } from '../../lib/engines';
@@ -170,6 +173,10 @@ const Dex = ({ state, creatureId }: PropsType) => {
           {renderIf(!!currentModel && !currentFamily, <p className="muted">Using <code>{currentModel}</code> from creature.yaml.</p>)}
         </div>
       ))}
+
+      {renderIf(isClaude, <ContextOptions creature={creature} />)}
+      <WeeklyBudget state={state} creature={creature} />
+      <BrainHealth creatureId={creature.id} rev={state.quests.length} />
 
       <div className="dex-grid">
         <div className="panel"><div className="eyebrow">Brain</div><ul>{creature.brain.map((item) => <li key={item}>{item}</li>)}</ul></div>

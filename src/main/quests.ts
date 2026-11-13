@@ -130,11 +130,16 @@ export class QuestStore {
   }
 
   // When the session was last used and how big it was, so a cold resume of a huge session can be avoided.
-  sessionActivity(sessionId: string): { at: number; contextTokens?: number } | undefined {
+  sessionActivity(sessionId: string): { at: number; contextTokens?: number; model?: string } | undefined {
     const last = this.quests.find((quest) => quest.sessionId === sessionId);
     if (!last) return undefined;
     const withContext = this.quests.find((quest) => quest.sessionId === sessionId && quest.usage?.contextTokens);
-    return { at: last.endedAt ?? last.startedAt, contextTokens: withContext?.usage?.contextTokens };
+    const withModel = this.quests.find((quest) => quest.sessionId === sessionId && quest.usage?.model);
+    return { at: last.endedAt ?? last.startedAt, contextTokens: withContext?.usage?.contextTokens, model: withModel?.usage?.model };
+  }
+
+  sessionFloor(creatureId: string): number | undefined {
+    return this.quests.find((quest) => quest.creatureId === creatureId && quest.freshSession && quest.usage?.baseTokens)?.usage?.baseTokens;
   }
 
   // Rough conversation size for engines that don't report it: what was sent and received so far.

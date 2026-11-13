@@ -56,6 +56,33 @@ describe('runClaude', () => {
     expect(lives[lives.length - 1].draft).toBe('');
     expect(lives[lives.length - 1].outputTokens).toBe(50);
     expect(outcome.usage?.contextTokens).toBe(22_105);
+    expect(outcome.usage?.baseTokens).toBe(1_010);
+    expect(outcome.usage?.compactions).toBe(1);
+    expect(outcome.compactLoop).toBe(false);
+  });
+
+  it('stops a chat that keeps auto-compacting without freeing much', async () => {
+    const { handle, events } = start({ FAKE_COMPACT_LOOP: '1' });
+    const outcome = await handle.done;
+    expect(outcome.ok).toBe(false);
+    expect(outcome.compactLoop).toBe(true);
+    expect(outcome.error).toContain('auto-compacted 3 times in a row');
+    expect(events.filter((event) => event.text.startsWith('Auto-compacted')).length).toBe(3);
+  });
+
+  it('reports the tools a run uses, helpers included', async () => {
+    resetFlagSupport();
+    const used: string[] = [];
+    const handle = runClaude({
+      bin: FAKE,
+      args: ['-p', '--output-format', 'stream-json'],
+      prompt: 'first',
+      cwd: process.cwd(),
+      env: process.env,
+      callbacks: { onEvent: () => undefined, onToolUse: (name) => used.push(name) },
+    });
+    await handle.done;
+    expect(used).toEqual(['Bash', 'Grep']);
   });
 
   it('hands a follow-up to the running task, then refuses input once the reply is done', async () => {

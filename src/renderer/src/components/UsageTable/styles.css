@@ -1,0 +1,10 @@
+.usage { display: grid; gap: 10px; }
+.usage-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.usage-empty { font-size: 12px; }
+.usage-grid { display: grid; overflow-x: auto; }
+.usage-row { display: grid; grid-template-columns: minmax(130px, 1.6fr) repeat(7, minmax(70px, 1fr)); gap: 10px; align-items: center; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.usage-row:last-child { border-bottom: 0; }
+.usage-row-head { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-3); }
+.usage-who { display: flex; align-items: center; gap: 8px; font-weight: 700; min-width: 0; }
+.usage-sprite { width: 22px; height: 22px; object-fit: contain; }
+.usage-warn { color: var(--amber); font-weight: 700; }

@@ -2,7 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { basename, join, resolve } from 'path';
 import YAML from 'yaml';
-import { DaycareMode, EngineAdapter, type DaycareModeType, type EngineAdapterType } from '@shared/constants';
+import { DaycareMode, EngineAdapter, LIGHT_MODEL, type DaycareModeType, type EngineAdapterType } from '@shared/constants';
 import { appHome, expandHome, vaultTemplateDir } from './paths';
 
 export type EngineConfigType = {
@@ -28,6 +28,13 @@ export type SessionConfigType = {
   idleResetMinTokens: number;
   // Lighter model to retry on when the creature's model is overloaded ('' turns it off).
   fallbackModel: string;
+  lightModel: string;
+};
+
+export type WatchConfigType = {
+  terminalSessions: boolean;
+  largeTokens: number;
+  notify: boolean;
 };
 
 export type LabConfigType = {
@@ -52,6 +59,7 @@ export type ProfileConfigType = {
   engines: Record<string, EngineConfigType>;
   guard: GuardConfigType;
   session: SessionConfigType;
+  watch: WatchConfigType;
   daycareMode: DaycareModeType;
   daycareAutoApproveFullAuto: boolean;
   spriteOverrides: string;
@@ -72,10 +80,14 @@ const DEFAULT_ENGINE = 'claude';
 const DEFAULT_OVERRIDES = 'sprites/overrides';
 const DEFAULT_AUTOCOMPACT_TOKENS = 200_000;
 const MIN_AUTOCOMPACT_TOKENS = 100_000;
-const MAX_AUTOCOMPACT_TOKENS = 1_000_000;
+export const MAX_AUTOCOMPACT_TOKENS = 1_000_000;
+export const AUTOCOMPACT_HEADROOM_TOKENS = 150_000;
+const DEFAULT_LARGE_SESSION_TOKENS = 300_000;
+const MIN_LARGE_SESSION_TOKENS = 50_000;
 const DEFAULT_IDLE_RESET_MINUTES = 60;
 const DEFAULT_IDLE_RESET_MIN_TOKENS = 40_000;
 const DEFAULT_FALLBACK_MODEL = 'sonnet';
+const DEFAULT_LIGHT_MODEL = LIGHT_MODEL;
 
 export const toSession = (value: unknown): SessionConfigType => {
   const raw = (value ?? {}) as Record<string, unknown>;
@@ -91,7 +103,21 @@ export const toSession = (value: unknown): SessionConfigType => {
         : DEFAULT_AUTOCOMPACT_TOKENS,
     idleResetMinutes: Number.isFinite(idle) && idle >= 0 && raw.idleResetMinutes !== undefined ? idle : DEFAULT_IDLE_RESET_MINUTES,
     fallbackModel: typeof raw.fallbackModel === 'string' ? raw.fallbackModel.trim() : DEFAULT_FALLBACK_MODEL,
+    lightModel: typeof raw.lightModel === 'string' ? raw.lightModel.trim() : DEFAULT_LIGHT_MODEL,
     idleResetMinTokens: Number.isFinite(minTokens) && minTokens >= 0 && raw.idleResetMinTokens !== undefined ? minTokens : DEFAULT_IDLE_RESET_MIN_TOKENS,
+  };
+};
+
+export const autocompactWindow = (configured: number, floorTokens?: number): number =>
+  configured <= 0 || !floorTokens ? Math.max(0, configured) : Math.min(MAX_AUTOCOMPACT_TOKENS, Math.max(configured, floorTokens + AUTOCOMPACT_HEADROOM_TOKENS));
+
+export const toWatch = (value: unknown): WatchConfigType => {
+  const raw = (value ?? {}) as Record<string, unknown>;
+  const large = Number(raw.largeTokens);
+  return {
+    terminalSessions: raw.terminalSessions !== false,
+    largeTokens: Number.isFinite(large) && large > 0 ? Math.max(MIN_LARGE_SESSION_TOKENS, large) : DEFAULT_LARGE_SESSION_TOKENS,
+    notify: raw.notify !== false,
   };
 };
 
@@ -250,6 +276,7 @@ export const loadProfileConfig = (vaultSetting: string): ProfileConfigType => {
       askBeyondLimits: guard.askBeyondLimits === true,
     },
     session: toSession(data.session),
+    watch: toWatch(data.watch),
     daycareMode: toDaycareMode(daycare),
     daycareAutoApproveFullAuto: daycare.autoApproveFullAuto === true,
     spriteOverrides: join(vault, typeof data.spriteOverrides === 'string' ? data.spriteOverrides : DEFAULT_OVERRIDES),

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
-import { AttachmentKind, EngineAdapter, QuestKind } from '@shared/constants';
-import type { AppStateType, AttachmentInfoType } from '@shared/types';
+import { AttachmentKind, CommandKind, EngineAdapter, QuestKind } from '@shared/constants';
+import type { AppStateType, AttachmentInfoType, CommandInfoType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
 import QuestLog from '../../components/QuestLog/QuestLog';
@@ -229,8 +229,8 @@ const Party = ({ state, creatureId }: PropsType) => {
     return [...starts, ...contains].slice(0, SLASH_LIMIT);
   }, [commands, slashQuery, draft, slashDismissed]);
   useEffect(() => setSlashIndex(0), [slashQuery]);
-  const pickSlash = useCallback((name: string) => {
-    setDraft(`/${name} `);
+  const pickSlash = useCallback((entry: CommandInfoType) => {
+    setDraft(entry.kind === CommandKind.TEMPLATE && entry.prompt ? entry.prompt : `/${entry.name} `);
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
@@ -244,7 +244,7 @@ const Party = ({ state, creatureId }: PropsType) => {
       }
       if (event.key === 'Tab' || (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing)) {
         event.preventDefault();
-        pickSlash(slashMatches[Math.min(slashIndex, slashMatches.length - 1)].name);
+        pickSlash(slashMatches[Math.min(slashIndex, slashMatches.length - 1)]);
         return;
       }
       if (event.key === 'Escape') {
@@ -399,15 +399,15 @@ const Party = ({ state, creatureId }: PropsType) => {
         <div className="party-slash" role="listbox" aria-label="Commands and skills">
           {slashMatches.map((entry, index) => (
             <button
-              key={entry.name}
+              key={`${entry.kind}:${entry.name}`}
               role="option"
               aria-selected={index === slashIndex}
               className="party-slash-item"
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => pickSlash(entry.name)}
+              onClick={() => pickSlash(entry)}
             >
               <span className="party-slash-name">/{entry.name}</span>
-              <span className="party-slash-kind">{entry.kind === 'builtin' ? 'Claude Code' : entry.kind}</span>
+              <span className="party-slash-kind">{entry.kind === CommandKind.BUILTIN ? 'Claude Code' : entry.kind}</span>
               <span className="party-slash-desc">{entry.description || 'No description'}</span>
             </button>
           ))}

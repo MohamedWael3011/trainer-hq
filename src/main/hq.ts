@@ -2,7 +2,9 @@ import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import {
+  AUTO_MODEL,
   Autonomy,
+  ContextOption,
   MAX_HANDOFF_DEPTH,
   DaycareAction,
   DaycareMode,
@@ -34,6 +36,12 @@ import type {
   ThreadCreateRequestType,
   ThreadType,
   UsageType,
+  BrainHealthType,
+  CreatureContextRequestType,
+  ScheduleSaveRequestType,
+  ScheduleType,
+  SessionAdoptRequestType,
+  TerminalSessionType,
 } from '@shared/types';
 import { ApprovalBroker, type AskRequestType } from './approvals';
 import { attachmentDirs, detectPaths, inlineImages, installSkill, prepareAttachments } from './attachments';
@@ -45,13 +53,20 @@ import { limitResetAt } from './limits';
 import { describeCommands } from './commands';
 import { newOutputs, pathsInText } from './outputs';
 import { claudeFlagSupport, resetFlagSupport } from './engines/claudeFlags';
-import { buildSystemPrompt } from './brain';
+import { brainFiles, buildSystemPrompt, inlinedNotePaths } from './brain';
+import { downscaleImage } from './images';
+import { BUDGET_DAYS, UsageLedger } from './ledger';
+import { NoteReadLog } from './noteReads';
+import { resolveModel } from './routing';
+import { ScheduleStore } from './schedules';
+import { scanTerminalSessions, terminalSessionRecap } from './sessionWatch';
+import { listTemplates, seedTemplates } from './templates';
 import { addProfile, loadProfileConfig, loadProfiles, setActiveProfile, type ProfileConfigType } from './config';
 import { approveNote, buildProposalPrompt, dismissNote, inlineProposals, listDaycare, parseProposals, worthReviewing, writeProposals, type ProposalType } from './daycare';
 import { runClaude } from './engines/claude';
 import { runCli } from './engines/cli';
 import type { RunHandleType } from './engines/types';
-import { planClaudeRun, sessionContextFromLog } from './guard';
+import { planClaudeRun, sessionContextFromLog, type RunContextType } from './guard';
 import { buildHatchPrompt, hatcheryCreature } from './hatchery';
 import { resourcesDir } from './paths';
 import { QuestStore } from './quests';
@@ -65,6 +80,22 @@ import { loadUi, saveUi } from './ui';
 import { listAntigravityModels, planAntigravityArgs, runAntigravity } from './engines/antigravity';
 
 const AGY_SESSION_PREFIX = 'agy:';
+const NOTE_TOOLS = new Set(['Read', 'Grep']);
+const CONTEXT_OPTION_IDS = Object.values(ContextOption) as string[];
+const SESSION_WATCH_MS = 60_000;
+const SCHEDULE_TICK_MS = 30_000;
+const DEFAULT_COLD_MINUTES = 60;
+const TOKENS_PER_K = 1000;
+
+export type NudgeType = {
+  title: string;
+  body: string;
+};
+
+type SeenSessionType = {
+  large: boolean;
+  cold: boolean;
+};
 
 type HeldEntryType = {
   creatureId: string;
@@ -128,6 +159,14 @@ export class Hq {
   private listeners = new Set<(state: AppStateType) => void>();
   private readonly quests = new QuestStore(() => this.emit());
   private readonly threads = new ThreadStore();
+  private readonly ledger = new UsageLedger();
+  private readonly noteReads = new NoteReadLog();
+  private readonly schedules = new ScheduleStore();
+  private terminalSessions: TerminalSessionType[] = [];
+  private seenSessions = new Map<string, SeenSessionType>();
+  private nudgeListeners = new Set<(nudge: NudgeType) => void>();
+  private watchTimer: NodeJS.Timeout | undefined;
+  private scheduleTimer: NodeJS.Timeout | undefined;
   readonly lab = new Lab(
     () => ({ config: this.profile.lab, env: this.profile.env }),
     () => this.emitLab(),
@@ -164,6 +203,16 @@ export class Hq {
     this.profile = loadProfileConfig(file.profiles[file.active].vault);
     this.quests.load(this.profileId);
     this.threads.load(this.profileId);
+    this.ledger.load(this.profileId);
+    this.noteReads.load(this.profileId);
+    this.schedules.load(this.profileId);
+    seedTemplates(this.profile.vault);
+    this.seenSessions = new Map();
+    this.refreshTerminalSessions();
+    if (this.watchTimer) clearInterval(this.watchTimer);
+    this.watchTimer = setInterval(() => this.refreshTerminalSessions(), SESSION_WATCH_MS);
+    if (this.scheduleTimer) clearInterval(this.scheduleTimer);
+    this.scheduleTimer = setInterval(() => this.runDueSchedules(), SCHEDULE_TICK_MS);
     this.outputs = undefined;
     this.held = new Map(Object.entries(this.quests.loadHeld<HeldEntryType>()));
     this.scheduleHeld();
@@ -265,6 +314,9 @@ export class Hq {
         count: entry.requests.length,
       })),
       errors: this.errors,
+      usageReport: this.ledger.report(this.creatures),
+      terminalSessions: this.terminalSessions,
+      schedules: this.schedules.list(),
     };
   }
 
@@ -278,10 +330,11 @@ export class Hq {
     return creature;
   }
 
-  private env(): NodeJS.ProcessEnv {
+  private env(artifacts = true): NodeJS.ProcessEnv {
     // Headless Claude Code leaves out the Artifact tools unless this is set. Set it to 0 under
     // env: in profile.yaml to turn them off.
     const env: NodeJS.ProcessEnv = { CLAUDE_CODE_ARTIFACT: '1', ...process.env, ...this.profile.env };
+    if (!artifacts) delete env.CLAUDE_CODE_ARTIFACT;
     delete env.ELECTRON_RUN_AS_NODE;
     if (this.profile.claudeConfigDir) env.CLAUDE_CONFIG_DIR = this.profile.claudeConfigDir;
     return env;
@@ -308,6 +361,16 @@ export class Hq {
       this.quests.addEvent(quest.id, {
         kind: EventKind.ERROR,
         text: `Not started: your 5-hour plan usage is at ${Math.round(planUsage * 100)}%, above the full-auto limit of ${Math.round(this.profile.guard.fullAutoMaxPlanUsage * 100)}%. Switch this creature to auto-edit or wait for the reset.`,
+      });
+      this.quests.setStatus(quest.id, QuestStatus.PAUSED);
+      return quest.id;
+    }
+    const weeklyBudget = creature.weeklyBudgetUsd;
+    const weekSpend = weeklyBudget ? this.ledger.spentSince(creature.id, BUDGET_DAYS) : 0;
+    if (weeklyBudget && weekSpend >= weeklyBudget) {
+      this.quests.addEvent(quest.id, {
+        kind: EventKind.ERROR,
+        text: `Not started: ${creature.name} has used $${weekSpend.toFixed(2)} of its $${weeklyBudget.toFixed(2)} weekly budget. Raise the budget in the Dex or wait for older days to roll off.`,
       });
       this.quests.setStatus(quest.id, QuestStatus.PAUSED);
       return quest.id;
@@ -339,10 +402,39 @@ export class Hq {
           : 'Started a fresh session: the previous one was large and idle, so resuming it would have resent the whole conversation. A short recap was carried over.',
       });
     }
+    if (thread?.recap && !stored && !recapContext) {
+      recapContext = `This thread continues a Claude Code terminal session that had grown too large to keep resending. The last exchanges were:\n\n${thread.recap}\n\nIf you need more than this, check your brain notes, git log or the files, or ask the user. Don't re-explore everything.`;
+      this.threads.consumeRecap(thread.id);
+    }
     const systemPrompt = buildSystemPrompt(creature, this.profile, this.creatures, [threadContext, recapContext].filter(Boolean).join('\n\n'));
     const agySession = stored?.startsWith(AGY_SESSION_PREFIX) ? stored.slice(AGY_SESSION_PREFIX.length) : undefined;
     const claudeSession = stored && !stored.startsWith(AGY_SESSION_PREFIX) ? stored : undefined;
+    const isClaudeEngine = engine.adapter === EngineAdapter.CLAUDE;
+    const routedModel = isClaudeEngine
+      ? resolveModel({
+          model: creature.model,
+          kind,
+          prompt,
+          lightModel: this.profile.session.lightModel,
+          sessionModel: claudeSession ? this.quests.sessionActivity(claudeSession)?.model : undefined,
+          resumed: !!claudeSession,
+        })
+      : { model: creature.model === AUTO_MODEL ? undefined : creature.model, routed: false };
+    creature = { ...creature, model: routedModel.model };
+    if (routedModel.routed && kind === QuestKind.CHAT) {
+      this.quests.addEvent(quest.id, { kind: EventKind.SYSTEM, text: `Short lookup: answering on ${routedModel.model} to save plan use.` });
+    }
+    const context: RunContextType = {
+      artifacts: creature.artifacts && kind !== QuestKind.HANDOFF,
+      slashCommands: creature.slashCommands || prompt.trim().startsWith('/'),
+      connectors: creature.connectors,
+    };
     const callbacks = {
+      onToolUse: (name: string, input: Record<string, unknown>) => {
+        if (!NOTE_TOOLS.has(name)) return;
+        const target = input.file_path ?? input.path;
+        if (typeof target === 'string' && target.startsWith(this.profile.vault)) this.noteReads.record(target);
+      },
       onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => this.quests.addEvent(quest.id, event),
       onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : sessionId),
       onQuestUsage: (questUsage: QuestUsageType) => this.quests.setUsage(quest.id, questUsage),
@@ -381,6 +473,8 @@ export class Hq {
         skipWorktree: !!thread?.worktree || !checkoutBusy,
         supports: claudeFlagSupport(engine.bin, this.env()),
         sessionName: `${creature.name} · ${thread?.title ?? 'Main'}`,
+        context,
+        floorTokens: this.quests.sessionFloor(creature.id),
         bridge: {
           serverScript: join(resourcesDir(), 'mcp', 'permission-server.cjs'),
           nodeBinary: process.execPath,
@@ -390,7 +484,7 @@ export class Hq {
         },
       });
       if (!claudeSession && !isCompact) this.quests.markFreshSession(quest.id);
-      handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(), timeoutMs: plan.timeoutMs, callbacks });
+      handle = runClaude({ bin: engine.bin, args: [...engine.args, ...plan.args], prompt, cwd, env: this.env(context.artifacts), timeoutMs: plan.timeoutMs, callbacks });
     } else if (engine.adapter === EngineAdapter.ANTIGRAVITY) {
       const timeoutMs = creature.autonomy === Autonomy.FULL_AUTO ? this.profile.guard.fullAutoMaxMinutes * 60_000 : undefined;
       const args = planAntigravityArgs({ autonomy: creature.autonomy, model: creature.model, addDirs: [creature.dir, ...creature.addDirs], conversationId: agySession });
@@ -427,6 +521,18 @@ export class Hq {
       }
       this.approvals.denyAllForQuest(quest.id);
       if (outcome.usage) this.quests.setUsage(quest.id, outcome.usage);
+      const finished = this.quests.get(quest.id);
+      this.ledger.record(creature.id, {
+        usage: outcome.usage ?? finished?.usage,
+        handoff: kind === QuestKind.HANDOFF,
+        freshSession: !!finished?.freshSession,
+        coldReset: cold,
+      });
+      if (outcome.compactLoop) {
+        this.quests.addEvent(quest.id, { kind: EventKind.ERROR, text: outcome.error ?? 'Stopped: the chat kept auto-compacting.' });
+        this.quests.setStatus(quest.id, QuestStatus.FAILED);
+        return;
+      }
       if (outcome.ok) {
         if (outcome.resultText && engine.adapter === EngineAdapter.CLAUDE) this.quests.addEvent(quest.id, { kind: EventKind.RESULT, text: outcome.resultText });
         this.quests.setStatus(quest.id, QuestStatus.DONE);
@@ -494,7 +600,7 @@ export class Hq {
     if (liveId) {
       const paths = Array.from(new Set([...(request.attachments ?? []), ...detectPaths(request.text)]));
       // Screenshots and images go inside the message itself, like pasting one into Claude Code.
-      const images = inlineImages(paths);
+      const images = inlineImages(paths.map(downscaleImage));
       const isCommand = request.text.trim().startsWith('/');
       // Like the terminal: a message sent while Claude works is picked up mid-task by the same run.
       // Other files need new folder access and commands need a turn of their own, so those wait instead.
@@ -508,7 +614,7 @@ export class Hq {
       return liveId;
     }
     const paths = Array.from(new Set([...(request.attachments ?? []), ...detectPaths(request.text)]));
-    const prepared = prepareAttachments(paths);
+    const prepared = prepareAttachments(paths).map((entry) => ({ ...entry, target: downscaleImage(entry.target) }));
     if (prepared.length === 0) return this.launch(creature, QuestKind.CHAT, request.text, { resume: true, record: !recorded, thread, request });
     const moved = prepared.filter((entry) => entry.source !== entry.target);
     const notes = moved.map((entry) => `- ${entry.source} is available at ${entry.target}${entry.source.endsWith('.zip') ? ' (unzipped)' : ''}`);
@@ -597,7 +703,7 @@ export class Hq {
     const creature = this.creature(creatureId);
     const configDir = this.profile.claudeConfigDir ?? join(homedir(), '.claude');
     const projectDirs = [creature.cwd, this.profile.vault].filter((dir): dir is string => !!dir);
-    return describeCommands(this.commandNames.get(creatureId), projectDirs, configDir);
+    return [...listTemplates(this.profile.vault), ...describeCommands(this.commandNames.get(creatureId), projectDirs, configDir)];
   }
 
   cancelQueued(creatureId: string, threadId?: string): void {
@@ -829,6 +935,100 @@ export class Hq {
     this.emit();
   }
 
+  setCreatureContext(request: CreatureContextRequestType): void {
+    if (!CONTEXT_OPTION_IDS.includes(request.option)) throw new Error('Unknown context option.');
+    updateCreatureFile(this.creature(request.creatureId), { [request.option]: request.enabled });
+    this.reloadVault();
+  }
+
+  setCreatureBudget(creatureId: string, weeklyUsd: number): void {
+    const amount = Number(weeklyUsd);
+    updateCreatureFile(this.creature(creatureId), { budget: Number.isFinite(amount) && amount > 0 ? { weeklyUsd: amount } : undefined });
+    this.reloadVault();
+  }
+
+  brainHealth(creatureId: string): BrainHealthType {
+    const creature = this.creature(creatureId);
+    return this.noteReads.health(brainFiles(creature), inlinedNotePaths(creature, this.profile), this.profile.vault);
+  }
+
+  onNudge(listener: (nudge: NudgeType) => void): () => void {
+    this.nudgeListeners.add(listener);
+    return () => this.nudgeListeners.delete(listener);
+  }
+
+  private nudge(nudge: NudgeType): void {
+    this.nudgeListeners.forEach((listener) => listener(nudge));
+  }
+
+  private refreshTerminalSessions(): void {
+    const watch = this.profile.watch;
+    const next = watch.terminalSessions
+      ? scanTerminalSessions(this.profile.claudeConfigDir, { largeTokens: watch.largeTokens, coldMinutes: this.profile.session.idleResetMinutes || DEFAULT_COLD_MINUTES })
+      : [];
+    next.forEach((session) => {
+      const seen = this.seenSessions.get(session.sessionId);
+      const size = `${Math.round(session.contextTokens / TOKENS_PER_K)}k tokens`;
+      if (watch.notify && seen && session.large && !seen.large) {
+        this.nudge({ title: `${session.project} session is at ${size}`, body: 'Every step resends all of it. Run /compact there, or adopt it into a creature thread from the Trainer tab.' });
+      } else if (watch.notify && seen && session.large && session.cold && !seen.cold) {
+        this.nudge({ title: `${session.project} session went cold at ${size}`, body: 'Its cache expired, so resuming re-bills the whole conversation. Start fresh, or adopt it into a creature thread from the Trainer tab.' });
+      }
+      this.seenSessions.set(session.sessionId, { large: session.large, cold: session.cold });
+    });
+    const changed = JSON.stringify(next) !== JSON.stringify(this.terminalSessions);
+    this.terminalSessions = next;
+    if (changed) this.emit();
+  }
+
+  adoptSession(request: SessionAdoptRequestType): string {
+    const session = this.terminalSessions.find((entry) => entry.sessionId === request.sessionId);
+    if (!session) throw new Error('That terminal session is no longer listed.');
+    this.creature(request.creatureId);
+    const recap = terminalSessionRecap(this.profile.claudeConfigDir, session.sessionId);
+    const cwd = session.cwd && existsSync(session.cwd) ? session.cwd : undefined;
+    const thread = this.threads.adopt(request.creatureId, session.title, cwd, recap, session.sessionId);
+    this.emit();
+    return thread.id;
+  }
+
+  saveSchedule(request: ScheduleSaveRequestType): string {
+    this.creature(request.creatureId);
+    const id = this.schedules.save(request);
+    this.emit();
+    return id;
+  }
+
+  deleteSchedule(id: string): void {
+    this.schedules.remove(id);
+    this.emit();
+  }
+
+  runSchedule(id: string): void {
+    const schedule = this.schedules.get(id);
+    if (!schedule) throw new Error('That recurring quest no longer exists.');
+    this.schedules.markRan(id);
+    this.fireSchedule(schedule);
+  }
+
+  private runDueSchedules(): void {
+    this.schedules.due().forEach((schedule) => {
+      this.schedules.markRan(schedule.id);
+      this.fireSchedule(schedule);
+    });
+  }
+
+  private fireSchedule(schedule: ScheduleType): void {
+    try {
+      const thread = this.threads.get(schedule.threadId);
+      const questId = this.chat({ creatureId: schedule.creatureId, text: schedule.prompt, threadId: thread && !thread.archived ? thread.id : undefined });
+      this.quests.addEvent(questId, { kind: EventKind.SYSTEM, text: 'Recurring quest: started on its schedule.' });
+    } catch (error) {
+      this.errors = [...this.errors, `Recurring quest skipped: ${(error as Error).message}`];
+    }
+    this.emit();
+  }
+
   switchProfile(profileId: string): void {
     if (profileId === this.profileId) return;
     setActiveProfile(profileId);
@@ -946,6 +1146,8 @@ export class Hq {
     if (this.updateTimer) clearInterval(this.updateTimer);
     if (this.heldTimer) clearTimeout(this.heldTimer);
     if (this.usageTimer) clearTimeout(this.usageTimer);
+    if (this.watchTimer) clearInterval(this.watchTimer);
+    if (this.scheduleTimer) clearInterval(this.scheduleTimer);
     this.lab.stopAll();
     this.approvals.stop();
   }

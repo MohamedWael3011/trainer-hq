@@ -1,0 +1,17 @@
+.sched { display: grid; gap: 6px; }
+.sched-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.sched-empty { font-size: 12px; }
+.sched-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.sched-off { opacity: 0.55; }
+.sched-sprite { width: 32px; height: 32px; object-fit: contain; }
+.sched-main { display: grid; gap: 2px; min-width: 0; }
+.sched-prompt { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sched-meta { font-size: 11px; color: var(--fg-3); font-variant-numeric: tabular-nums; }
+.sched-side { display: flex; gap: 4px; align-items: center; }
+.sched-form { display: grid; gap: 8px; padding-top: 8px; }
+.sched-form textarea { width: 100%; resize: vertical; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); padding: 8px 12px; outline: 0; user-select: text; }
+.sched-form textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sched-fields { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sched-fields select, .sched-fields input { height: 27px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--surface-2); padding: 0 8px; font-size: 12px; }
+.sched-note { font-size: 11px; }
+.sched-error { color: var(--red); font-size: 12px; }

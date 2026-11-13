@@ -11,6 +11,7 @@ export type RunOutcomeType = {
   cancelled: boolean;
   timedOut: boolean;
   usage?: QuestUsageType;
+  compactLoop?: boolean;
 };
 
 export type RunHandleType = {
@@ -30,4 +31,5 @@ export type RunCallbacksType = {
   onCommands?: (names: string[]) => void;
   // Text a tool returned (its own or a helper's), scanned for files the run produced.
   onToolOutput?: (text: string) => void;
+  onToolUse?: (name: string, input: Record<string, unknown>) => void;
 };

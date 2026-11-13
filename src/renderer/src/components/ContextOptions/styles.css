@@ -1,0 +1,3 @@
+.ctxopt { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ctxopt-note { font-size: 12px; }
+@media (max-width: 900px) { .ctxopt { grid-template-columns: 1fr; } }

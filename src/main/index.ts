@@ -1,7 +1,7 @@
 import { join } from 'path';
-import { app, dialog, globalShortcut, ipcMain, net, protocol, shell } from 'electron';
+import { app, dialog, globalShortcut, ipcMain, net, Notification, protocol, shell } from 'electron';
 import { DOCK_SHORTCUT, Ipc, LAB_PROTOCOL, OUTPUT_PROTOCOL, NOTCH_SHORTCUT, SPRITE_PROTOCOL, type AutonomyType, type SurfaceType } from '@shared/constants';
-import type { ApprovalDecisionType, ChatRequestType, DaycareDecisionType, DockSizeType, HatchRequestType, LabShootRequestType, ProfileCreateRequestType, ProfileSettingsType, SkillInstallRequestType, ThreadCreateRequestType } from '@shared/types';
+import type { CreatureContextRequestType, ScheduleSaveRequestType, SessionAdoptRequestType, ApprovalDecisionType, ChatRequestType, DaycareDecisionType, DockSizeType, HatchRequestType, LabShootRequestType, ProfileCreateRequestType, ProfileSettingsType, SkillInstallRequestType, ThreadCreateRequestType } from '@shared/types';
 import { expandHome } from './paths';
 import { pathToFileURL } from 'url';
 import { inspectAttachment, savePastedFile } from './attachments';
@@ -94,6 +94,13 @@ const registerIpc = (): void => {
     if (persist) hq.setDockSize(applied);
     return applied;
   });
+  ipcMain.handle(Ipc.CREATURE_CONTEXT, (_event, request: CreatureContextRequestType) => hq.setCreatureContext(request));
+  ipcMain.handle(Ipc.CREATURE_BUDGET, (_event, creatureId: string, weeklyUsd: number) => hq.setCreatureBudget(creatureId, weeklyUsd));
+  ipcMain.handle(Ipc.BRAIN_HEALTH, (_event, creatureId: string) => hq.brainHealth(creatureId));
+  ipcMain.handle(Ipc.SCHEDULE_SAVE, (_event, request: ScheduleSaveRequestType) => hq.saveSchedule(request));
+  ipcMain.handle(Ipc.SCHEDULE_DELETE, (_event, id: string) => hq.deleteSchedule(id));
+  ipcMain.handle(Ipc.SCHEDULE_RUN, (_event, id: string) => hq.runSchedule(id));
+  ipcMain.handle(Ipc.SESSION_ADOPT, (_event, request: SessionAdoptRequestType) => hq.adoptSession(request));
   ipcMain.handle(Ipc.LOGIN_ITEM_SET, (_event, enabled: boolean) => app.setLoginItemSettings({ openAtLogin: enabled, openAsHidden: true }));
 };
 
@@ -126,6 +133,12 @@ app.whenReady().then(async () => {
   runSmokeIfRequested({ windows: () => windows.labeled(), state: () => hq.getState(), chat: (request) => hq.chat(request), openNotch: () => windows.toggleNotchFromShortcut(), openView: (view) => windows.dashboard?.webContents.send(Ipc.OPEN_VIEW, view), cancel: (questId) => hq.cancel(questId), openNotchAnimated: () => windows.openNotchAnimated() });
   // Dev runs (npm run dev) have no build info and skip the check.
   hq.startUpdateChecks();
+  hq.onNudge((nudge) => {
+    if (!Notification.isSupported()) return;
+    const notification = new Notification({ title: nudge.title, body: nudge.body, silent: true });
+    notification.on('click', () => windows.openDashboard());
+    notification.show();
+  });
   hq.onLive((live) => windows.all().forEach((win) => win.webContents.send(Ipc.LIVE_CHANGED, live)));
   hq.onState((state) => {
     windows.setDockVisible(!state.ui.dockHidden);

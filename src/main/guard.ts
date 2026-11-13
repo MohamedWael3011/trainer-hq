@@ -3,11 +3,18 @@ import { homedir } from 'os';
 import { basename, join } from 'path';
 import { ASK_TOOL, Autonomy, MCP_SERVER_NAME, PERMISSION_TOOL, PermissionMode } from '@shared/constants';
 import type { CreatureType } from '@shared/types';
-import type { ProfileConfigType } from './config';
+import { autocompactWindow, type ProfileConfigType } from './config';
 import { pushIfSupported, type FlagSupportType } from './engines/claudeFlags';
 
 const MS_PER_MINUTE = 60_000;
 const SETTINGS_FLAG = '--settings';
+const ARTIFACT_TOOL = /^Artifact/;
+
+export type RunContextType = {
+  artifacts: boolean;
+  slashCommands: boolean;
+  connectors: boolean;
+};
 
 export type ClaudeRunPlanType = {
   args: string[];
@@ -135,10 +142,15 @@ export const planClaudeRun = (options: {
   supports?: FlagSupportType;
   // Shown in `claude --resume` so the chat is easy to find from a terminal.
   sessionName?: string;
+  context?: RunContextType;
+  floorTokens?: number;
 }): ClaudeRunPlanType => {
   const { creature, profile, systemPrompt, bridge, resumeSessionId, questId, skipWorktree, sessionName } = options;
   const supports = options.supports ?? (() => true);
   const fullAuto = creature.autonomy === Autonomy.FULL_AUTO;
+  const context = options.context ?? { artifacts: true, slashCommands: true, connectors: true };
+  const allow = context.artifacts ? creature.tools.allow : creature.tools.allow.filter((rule) => !ARTIFACT_TOOL.test(rule));
+  const compactWindow = autocompactWindow(profile.session.autocompactTokens, options.floorTokens);
   const askBeyondLimits = profile.guard.askBeyondLimits && supports(SETTINGS_FLAG);
   const limits = [...profile.guard.alwaysDeny, ...creature.tools.deny];
   const deny = askBeyondLimits ? [] : limits;
@@ -175,14 +187,16 @@ export const planClaudeRun = (options: {
   if (creature.effort) pushIfSupported(args, supports, '--effort', creature.effort);
   // Keep per-folder details (cwd, git status) out of the system prompt so the shared prefix caches across creatures.
   pushIfSupported(args, supports, '--exclude-dynamic-system-prompt-sections');
-  if (profile.session.autocompactTokens > 0) pushIfSupported(args, supports, '--autocompact', String(profile.session.autocompactTokens));
+  if (compactWindow > 0) pushIfSupported(args, supports, '--autocompact', String(compactWindow));
+  if (!context.slashCommands) pushIfSupported(args, supports, '--disable-slash-commands');
+  if (!context.connectors) pushIfSupported(args, supports, '--strict-mcp-config');
   if (sessionName) pushIfSupported(args, supports, '--name', sessionName);
   if (effectiveResume) args.push('--resume', effectiveResume);
   if (fullAuto && profile.guard.fullAutoWorktree && !skipWorktree && canAutoWorktree(creature.cwd, nestedRepos) && !effectiveResume) {
     args.push('--worktree', `thq-${creature.id}-${questId.slice(0, 8)}`);
   }
   if (fullAuto && profile.guard.fullAutoMaxBudgetUsd) pushIfSupported(args, supports, '--max-budget-usd', String(profile.guard.fullAutoMaxBudgetUsd));
-  args.push('--allowedTools', ...creature.tools.allow, `mcp__${MCP_SERVER_NAME}__${ASK_TOOL}`);
+  args.push('--allowedTools', ...allow, `mcp__${MCP_SERVER_NAME}__${ASK_TOOL}`);
   if (deny.length > 0) args.push('--disallowedTools', ...deny);
   if (ask.length > 0) pushIfSupported(args, supports, SETTINGS_FLAG, JSON.stringify({ permissions: { ask } }));
   return {

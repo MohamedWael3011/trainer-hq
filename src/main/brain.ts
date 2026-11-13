@@ -124,7 +124,7 @@ const formatIndexEntry = (note: ParsedNoteType, creatureDir: string, coreInlined
   return `- ${relPath}${titlePart}${tagText}${summaryText}${sectionText}`;
 };
 
-export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfigType, party: CreatureType[] = [], extra = ''): string => {
+const placeNotes = (creature: CreatureType, profile: ProfileConfigType): { note: ParsedNoteType; inline: boolean }[] => {
   const files = brainFiles(creature);
   const hasNumberedWorkspace = files.some((file) => basename(file).toLowerCase() === '01-workspace.md');
   const notes = files
@@ -136,13 +136,23 @@ export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfig
     if (candidate) candidate.tier = 'hot';
   }
   let budget = HOT_BUDGET_CHARS;
+  return notes.map((note) => {
+    const inline = note.tier === 'hot' && note.coreBody.length > 0 && note.coreBody.length <= budget;
+    if (inline) budget -= note.coreBody.length;
+    return { note, inline };
+  });
+};
+
+export const inlinedNotePaths = (creature: CreatureType, profile: ProfileConfigType): string[] =>
+  placeNotes(creature, profile).filter((entry) => entry.inline).map((entry) => entry.note.file);
+
+export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfigType, party: CreatureType[] = [], extra = ''): string => {
   const inlined: string[] = [];
   const indexed: string[] = [];
 
-  notes.forEach((note) => {
-    if (note.tier === 'hot' && note.coreBody.length > 0 && note.coreBody.length <= budget) {
+  placeNotes(creature, profile).forEach(({ note, inline }) => {
+    if (inline) {
       inlined.push(`<note path="${note.label}">\n${note.coreBody}\n</note>`);
-      budget -= note.coreBody.length;
       if (note.learnedCount > 0) indexed.push(formatIndexEntry(note, creature.dir, true));
     } else {
       indexed.push(formatIndexEntry(note, creature.dir, false));
@@ -159,6 +169,7 @@ export const buildSystemPrompt = (creature: CreatureType, profile: ProfileConfig
     extra,
     `Your notes live in ${creature.dir}.`,
     'Keep the conversation lean: everything you read stays in context and is resent on every step. Find things with Grep/Glob first, Read big files with offset/limit instead of whole, never re-read a file you already have, change code with Edit rather than writing throwaway patch scripts, and keep command output short (head, --stat, -n).',
+    'Images are costly to look at: open one at a time, and when a screenshot is larger than you need, shrink a copy first (sips -Z 1568 file --out copy) or build one contact sheet instead of reading many files.',
     // Helper agents are Claude Code's Agent tool; other engines don't have it.
     usesClaudeCode
       ? 'For broad searches across many files, or reading long docs, PDFs or logs, hand the reading to a helper agent (the Agent tool, e.g. Explore) and work from its summary: it reads in its own context, so yours stays small.'

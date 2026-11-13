@@ -1,0 +1,3 @@
+.wbudget { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; }
+.wbudget-field { display: flex; align-items: center; gap: 6px; height: 32px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface-2); padding: 0 10px; }
+.wbudget-field input { width: 90px; border: 0; background: transparent; outline: 0; user-select: text; }

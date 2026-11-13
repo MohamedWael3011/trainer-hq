@@ -11,6 +11,7 @@ const PARTY_DIR = 'party';
 const CREATURE_FILE = 'creature.yaml';
 const DEFAULT_BRAIN = ['brain/*.md'];
 const WATCH_DEBOUNCE_MS = 250;
+const ARTIFACT_TOOL = /^Artifact/;
 const AUTONOMY_VALUES = Object.values(Autonomy) as string[];
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.map(String) : []);
@@ -38,6 +39,8 @@ const parseCreature = (dir: string, index: number): CreatureType | null => {
   const tools = (data.tools ?? {}) as Record<string, unknown>;
   const learns = (data.learns ?? {}) as Record<string, unknown>;
   const id = typeof data.id === 'string' ? data.id : basename(dir);
+  const allow = strings(tools.allow);
+  const budget = Number((data.budget as Record<string, unknown> | undefined)?.weeklyUsd);
   return {
     id,
     no: typeof data.no === 'number' ? data.no : index + 1,
@@ -53,11 +56,15 @@ const parseCreature = (dir: string, index: number): CreatureType | null => {
     addDirs: strings(data.addDirs).map((path) => expandHome(path, dir)),
     brain: data.brain ? strings(data.brain) : DEFAULT_BRAIN,
     skills: strings(data.skills),
-    tools: { allow: strings(tools.allow), ask: strings(tools.ask), deny: strings(tools.deny) },
+    tools: { allow, ask: strings(tools.ask), deny: strings(tools.deny) },
     autonomy: toAutonomy(data.autonomy),
     learnsInto: typeof learns.into === 'string' ? learns.into : 'brain/',
     learnsReview: learns.review !== false,
     dir,
+    artifacts: typeof data.artifacts === 'boolean' ? data.artifacts : allow.some((rule) => ARTIFACT_TOOL.test(rule)),
+    slashCommands: data.slashCommands !== false,
+    connectors: data.connectors !== false,
+    weeklyBudgetUsd: Number.isFinite(budget) && budget > 0 ? budget : undefined,
   };
 };
 
@@ -91,7 +98,7 @@ export const updateCreatureFile = (creature: CreatureType, patch: Record<string,
 export const watchVault = (vault: string, onChange: () => void): (() => void) => {
   let timer: NodeJS.Timeout | undefined;
   const watcher = chokidar.watch(
-    [join(vault, PARTY_DIR), join(vault, 'daycare', 'inbox'), join(vault, 'profile.yaml'), join(vault, 'sprites')],
+    [join(vault, PARTY_DIR), join(vault, 'daycare', 'inbox'), join(vault, 'profile.yaml'), join(vault, 'sprites'), join(vault, 'templates')],
     { ignoreInitial: true, depth: 3 },
   );
   watcher.on('all', () => {

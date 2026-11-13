@@ -29,6 +29,9 @@ export const hatcheryCreature = (profile: ProfileConfigType, repos: string[]): C
   learnsInto: 'brain/',
   learnsReview: true,
   dir: join(profile.vault, 'party'),
+  artifacts: false,
+  slashCommands: true,
+  connectors: true,
 });
 
 export const buildHatchPrompt = (request: HatchRequestType, profile: ProfileConfigType, nextNo: number): string => {

@@ -4,6 +4,7 @@ import type { AppStateType } from '@shared/types';
 import Sprite from '../../components/Sprite/Sprite';
 import Badge from '../../components/Badge/Badge';
 import ApprovalCard from '../../components/ApprovalCard/ApprovalCard';
+import Schedules from '../../components/Schedules/Schedules';
 import { renderIf } from '../../lib/renderIf';
 import { STATUS_LABEL, STATUS_TONE, creatureName, duration, isLive, questUsageSummary, timeAgo } from '../../lib/format';
 import './styles.css';
@@ -44,6 +45,7 @@ const Quests = ({ state, onOpen }: PropsType) => {
           ))}
         </div>
       </div>
+      <Schedules state={state} />
       {state.approvals.map((approval) => <ApprovalCard key={approval.id} state={state} approval={approval} />)}
       <div className="quests-list">
         {quests.map((quest) => {

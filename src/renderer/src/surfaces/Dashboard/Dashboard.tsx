@@ -258,7 +258,7 @@ const Dashboard = ({ state }: PropsType) => {
               }}
             />
           ))}
-          {renderIf(view === View.TRAINER, <Trainer state={state} />)}
+          {renderIf(view === View.TRAINER, <Trainer state={state} onOpen={(id) => { setSelected(id); setView(View.PARTY); }} />)}
           {renderIf(view === View.SETTINGS, <Settings state={state} onRestartOnboarding={() => { void window.hq.setOnboarded(false); setTouring(true); }} />)}
         </main>
       </div>
