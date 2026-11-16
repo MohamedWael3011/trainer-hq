@@ -54,3 +54,8 @@
 .party-slash-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-3); }
 .party-slash-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg-2); }
 .party-slash-hint { padding: 4px 10px 2px; font-size: 10px; color: var(--fg-3); }
+
+.party-aside { display: grid; gap: 6px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.party-aside-q { font-size: 12px; font-weight: 700; color: var(--fg-2); }
+.party-aside-a { font-size: 13px; white-space: pre-wrap; }
+.party-aside-a.error { color: var(--danger, #c0392b); }

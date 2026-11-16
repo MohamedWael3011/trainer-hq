@@ -173,6 +173,7 @@ export const Ipc = {
   THREAD_HELD_SEND: 'thread:held-send',
   THREAD_HELD_CANCEL: 'thread:held-cancel',
   THREAD_QUEUED_CANCEL: 'thread:queued-cancel',
+  ASIDE_DISMISS: 'aside:dismiss',
   COMMANDS_LIST: 'commands:list',
   UPDATE_CHECK: 'update:check',
   UPDATE_INSTALL: 'update:install',

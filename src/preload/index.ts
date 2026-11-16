@@ -79,6 +79,7 @@ const api: HqApiType = {
   openThreadInTerminal: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_TERMINAL, creatureId, threadId),
   sendHeldNow: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_HELD_SEND, creatureId, threadId),
   listCommands: (creatureId: string): Promise<CommandInfoType[]> => ipcRenderer.invoke(Ipc.COMMANDS_LIST, creatureId),
+  dismissAside: (id: string): Promise<void> => ipcRenderer.invoke(Ipc.ASIDE_DISMISS, id),
   cancelQueued: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_QUEUED_CANCEL, creatureId, threadId),
   cancelHeld: (creatureId: string, threadId?: string): Promise<void> => ipcRenderer.invoke(Ipc.THREAD_HELD_CANCEL, creatureId, threadId),
   checkUpdate: (): Promise<UpdateInfoType | undefined> => ipcRenderer.invoke(Ipc.UPDATE_CHECK),

@@ -254,6 +254,7 @@ export type AppStateType = {
   update?: UpdateInfoType;
   held: HeldChatType[];
   queued: QueuedChatType[];
+  asides: AsideType[];
   errors: string[];
   usageReport: UsageReportType;
   terminalSessions: TerminalSessionType[];
@@ -266,6 +267,16 @@ export type CommandInfoType = {
   description: string;
   kind: CommandKindType;
   prompt?: string;
+};
+
+// A /btw side question: answered from a fork of the chat, so it never joins the chat or interrupts the reply.
+export type AsideType = {
+  id: string;
+  creatureId: string;
+  threadId?: string;
+  question: string;
+  answer?: string;
+  error?: string;
 };
 
 // Messages sent while a creature works that wait for its reply to finish.

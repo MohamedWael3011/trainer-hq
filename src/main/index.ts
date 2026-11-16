@@ -74,6 +74,7 @@ const registerIpc = (): void => {
   ipcMain.handle(Ipc.THREAD_TERMINAL, (_event, creatureId: string, threadId?: string) => hq.openThreadInTerminal(creatureId, threadId));
   ipcMain.handle(Ipc.THREAD_HELD_SEND, (_event, creatureId: string, threadId?: string) => hq.sendHeldNow(creatureId, threadId));
   ipcMain.handle(Ipc.COMMANDS_LIST, (_event, creatureId: string) => hq.listCommands(creatureId));
+  ipcMain.handle(Ipc.ASIDE_DISMISS, (_event, id: string) => hq.dismissAside(id));
   ipcMain.handle(Ipc.THREAD_QUEUED_CANCEL, (_event, creatureId: string, threadId?: string) => hq.cancelQueued(creatureId, threadId));
   ipcMain.handle(Ipc.THREAD_HELD_CANCEL, (_event, creatureId: string, threadId?: string) => hq.cancelHeld(creatureId, threadId));
   ipcMain.handle(Ipc.AUTH_LOGIN, () => hq.openLogin());

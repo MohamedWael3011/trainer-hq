@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -26,6 +27,7 @@ import type {
   AppStateType,
   AuthStatusType,
   ApprovalDecisionType,
+  AsideType,
   ChatRequestType,
   CreatureType,
   DaycareDecisionType,
@@ -169,6 +171,7 @@ export class Hq {
   private liveListeners = new Set<(live: Record<string, QuestLiveType>) => void>();
   private liveTimer: NodeJS.Timeout | undefined;
   private chatQueue = new Map<string, ChatRequestType[]>();
+  private asides = new Map<string, AsideType>();
   // Messages that hit the plan usage limit, per session, sent again once the limit resets.
   private held = new Map<string, HeldEntryType>();
   // What each creature's last Claude run said it can run, for slash-command suggestions.
@@ -331,6 +334,7 @@ export class Hq {
         threadId: requests[0].threadId,
         texts: requests.map((request) => request.text),
       })),
+      asides: Array.from(this.asides.values()),
       held: Array.from(this.held.values()).map((entry) => ({
         creatureId: entry.creatureId,
         threadId: entry.threadId,
@@ -559,19 +563,28 @@ export class Hq {
       this.setLive(quest.id, undefined);
       if (this.liveChats.get(sessionKey) === quest.id) {
         this.liveChats.delete(sessionKey);
-        // Send what was queued behind this run, in order, as one message. A stopped run drops the queue.
+        // Send what was queued behind this run, in order. Stopping a run keeps the queue, like Esc in the terminal.
+        // A command needs a turn of its own, so only plain messages are merged; the rest wait for the next turn.
         const queued = this.chatQueue.get(sessionKey) ?? [];
         this.chatQueue.delete(sessionKey);
-        if (queued.length > 0 && !outcome.cancelled) {
+        if (queued.length > 0) {
+          const isCommand = (entry: ChatRequestType): boolean => entry.text.trim().startsWith('/');
+          const batch = isCommand(queued[0]) ? [queued[0]] : queued.slice(0, queued.findIndex(isCommand) === -1 ? queued.length : queued.findIndex(isCommand));
+          const rest = queued.slice(batch.length);
           setTimeout(() => {
             try {
               this.chat({
-                ...queued[0],
-                text: queued.map((entry) => entry.text).join('\n\n'),
-                attachments: queued.flatMap((entry) => entry.attachments ?? []),
+                ...batch[0],
+                text: batch.map((entry) => entry.text).join('\n\n'),
+                attachments: batch.flatMap((entry) => entry.attachments ?? []),
               });
             } catch {
               // The creature or thread is gone; nothing to send to.
+              return;
+            }
+            if (rest.length > 0) {
+              this.chatQueue.set(sessionKey, [...rest, ...(this.chatQueue.get(sessionKey) ?? [])]);
+              this.emit();
             }
           }, 0);
         }
@@ -662,6 +675,13 @@ export class Hq {
 
   // `recorded`: the message is already in the chat log (a held message being sent again).
   chat(request: ChatRequestType, recorded = false): string {
+    // /btw: a side question answered from a fork of this chat, like the terminal's.
+    const aside = request.text.match(/^\s*\/btw\s+([\s\S]+)$/i);
+    if (aside) {
+      const started = this.aside(request, aside[1].trim());
+      if (started) return started;
+      request = { ...request, text: aside[1].trim() };
+    }
     const creature = this.creature(request.creatureId);
     const thread = this.threads.get(request.threadId);
     const sessionKey = threadKey(creature.id, thread?.id);
@@ -699,6 +719,42 @@ export class Hq {
     const prompt = notes.length > 0 ? `${request.text}\n\n${notes.join('\n')}` : request.text;
     const withAccess = { ...creature, addDirs: [...creature.addDirs, ...attachmentDirs(prepared.map((entry) => entry.target))] };
     return this.launch(withAccess, QuestKind.CHAT, prompt, { resume: true, record: !recorded, thread, request });
+  }
+
+  // Forks the chat's session (full context, own copy) with no tools, so the answer can't touch the work or the history.
+  // Returns undefined when there is no Claude session to fork yet; the caller then sends it as a normal message.
+  private aside(request: ChatRequestType, question: string): string | undefined {
+    const creature = this.creature(request.creatureId);
+    const thread = this.threads.get(request.threadId);
+    const stored = this.quests.sessionFor(threadKey(creature.id, thread?.id));
+    const engine = this.profile.engines[creature.engine] ?? this.profile.engines.claude;
+    if (!question || !stored || engine.adapter !== EngineAdapter.CLAUDE || stored.startsWith(AGY_SESSION_PREFIX) || stored.startsWith(BACKUP_SESSION_PREFIX)) return undefined;
+    const cwdBase = thread?.cwd ?? creature.cwd;
+    const cwd = cwdBase && existsSync(cwdBase) ? cwdBase : this.profile.vault;
+    const id = randomUUID();
+    const entry: AsideType = { id, creatureId: creature.id, threadId: thread?.id, question };
+    this.asides.set(id, entry);
+    this.emit();
+    const model = this.quests.sessionActivity(stored)?.model;
+    const handle = runClaude({
+      bin: engine.bin,
+      args: ['-p', '--output-format', 'stream-json', '--verbose', '--tools', '', '--resume', stored, '--fork-session', ...(model ? ['--model', model] : [])],
+      prompt: `Side question from the user, asked while the main work carries on. Answer it briefly from what you already know in this conversation. You have no tools, so don't try to run anything or continue the task.\n\n${question}`,
+      cwd,
+      env: this.env(),
+      callbacks: { onEvent: () => undefined },
+    });
+    void handle.done.then((outcome) => {
+      if (!this.asides.has(id)) return;
+      this.asides.set(id, outcome.ok ? { ...entry, answer: outcome.resultText || 'No answer.' } : { ...entry, error: outcome.error ?? 'The side question failed.' });
+      this.emit();
+    });
+    return id;
+  }
+
+  dismissAside(id: string): void {
+    this.asides.delete(id);
+    this.emit();
   }
 
   private hold(sessionKey: string, request: ChatRequestType, resumeAt: number, questId: string): void {

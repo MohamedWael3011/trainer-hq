@@ -353,6 +353,16 @@ const Party = ({ state, creatureId }: PropsType) => {
             </div>
           </div>
         ))}
+        {state.asides.filter((entry) => entry.creatureId === creature.id && entry.threadId === thread?.id).map((entry) => (
+          <div key={entry.id} className="party-aside">
+            <div className="party-aside-q selectable">/btw {entry.question}</div>
+            <div className={`party-aside-a selectable${entry.error ? ' error' : ''}`}>{entry.error ?? entry.answer ?? 'Thinking…'}</div>
+            <div className="party-queued-note">
+              <span>Side answer: not part of the chat.</span>
+              <button className="btn sm ghost" onClick={() => void window.hq.dismissAside(entry.id)}>Dismiss</button>
+            </div>
+          </div>
+        ))}
         {approvals.map((approval) => <ApprovalCard key={approval.id} state={state} approval={approval} />)}
         <div ref={endRef} />
         {renderIf(behind, <button className="party-jump" onClick={jumpToLatest}>↓ Jump to latest</button>)}

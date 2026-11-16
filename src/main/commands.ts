@@ -10,6 +10,7 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 // Built into Claude Code, so there's no file to read a description from.
 const BUILTIN: Record<string, string> = {
+  btw: 'Ask a side question from this chat\'s context, without interrupting or adding to the chat.',
   compact: 'Summarize the conversation so far to free up context. Keeps the thread, costs less per step.',
   context: 'Show what is filling the context window.',
   cost: 'Show token use and cost for this session.',
@@ -122,7 +123,7 @@ const buildIndex = (projectDirs: string[], configDir: string): Map<string, Found
 // (its init message); without that, everything found on disk plus the common built-ins.
 export const describeCommands = (names: string[] | undefined, projectDirs: string[], configDir: string): CommandInfoType[] => {
   const index = buildIndex(projectDirs, configDir);
-  const all = names ?? Array.from(new Set([...index.keys(), ...Object.keys(BUILTIN)]));
+  const all = Array.from(new Set([...(names ?? [...index.keys(), ...Object.keys(BUILTIN)]), 'btw']));
   return all
     .map((name) => {
       const found = index.get(name);
