@@ -472,6 +472,17 @@ export class Hq {
       slashCommands: creature.slashCommands || prompt.trim().startsWith('/'),
       connectors: creature.connectors,
     };
+    const recordOutputs = (text: string): void => {
+      const paths = pathsInText(text);
+      if (paths.length === 0) return;
+      const shown = new Set((this.quests.get(quest.id)?.events ?? []).filter((event) => event.kind === EventKind.OUTPUT).map((event) => event.text));
+      newOutputs(paths, quest.startedAt, [cwd, this.profile.vault])
+        .filter((path) => !shown.has(path))
+        .forEach((path) => {
+          this.knownOutputs().add(path);
+          this.quests.addEvent(quest.id, { kind: EventKind.OUTPUT, text: path });
+        });
+    };
     const callbacks = {
       onToolUse: (name: string, input: Record<string, unknown>) => {
         const edited = editedPath(name, input);
@@ -481,22 +492,16 @@ export class Hq {
         const target = input.file_path ?? input.path;
         if (typeof target === 'string' && target.startsWith(this.profile.vault)) this.noteReads.record(target);
       },
-      onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => this.quests.addEvent(quest.id, event),
+      onEvent: (event: { kind: (typeof EventKind)[keyof typeof EventKind]; text: string }) => {
+        this.quests.addEvent(quest.id, event);
+        // Files a creature only names in its reply (a link or path) get thumbnails too.
+        if (event.kind === EventKind.TEXT) recordOutputs(event.text);
+      },
       onSession: (sessionId: string) => this.quests.setSession(quest.id, engine.adapter === EngineAdapter.ANTIGRAVITY ? `${AGY_SESSION_PREFIX}${sessionId}` : backup ? `${BACKUP_SESSION_PREFIX}${sessionId}` : sessionId),
       onQuestUsage: (questUsage: QuestUsageType) => this.quests.setUsage(quest.id, questUsage),
       onLive: (live: QuestLiveType) => this.setLive(quest.id, live),
       onCommands: (names: string[]) => this.commandNames.set(creature.id, names),
-      onToolOutput: (text: string) => {
-        const paths = pathsInText(text);
-        if (paths.length === 0) return;
-        const shown = new Set((this.quests.get(quest.id)?.events ?? []).filter((event) => event.kind === EventKind.OUTPUT).map((event) => event.text));
-        newOutputs(paths, quest.startedAt, [cwd, this.profile.vault])
-          .filter((path) => !shown.has(path))
-          .forEach((path) => {
-            this.knownOutputs().add(path);
-            this.quests.addEvent(quest.id, { kind: EventKind.OUTPUT, text: path });
-          });
-      },
+      onToolOutput: recordOutputs,
       onUsage: (usage: UsageType) => {
         if (backup) {
           this.backupUsage = usage;
